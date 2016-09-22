@@ -2,5 +2,11 @@
 
 module Utility where
 
-newtype Fix f = Fix { unFix :: f (Fix f) }
-deriving instance Eq (f (Fix f)) => Eq (Fix f) --ezt miért kellett külön?
+import Control.Comonad.Cofree
+
+type Fix f = Cofree f ()
+
+fix :: f (Fix f) -> Fix f
+fix = (() :<)
+
+--deriving instance Eq (f (Fix f)) => Eq (Fix f) --ezt miért kellett külön?

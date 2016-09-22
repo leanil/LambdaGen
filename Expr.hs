@@ -27,44 +27,44 @@ data ExprF a
 --instance Functor ExtF where
 --    fmap f (ExtF o t) = ExtF (fmap f o) t
 
-type Expr = Cofree ExprF ()
+type Expr = Fix ExprF
 
 scl :: Double -> Expr
-scl x = () :< Scalar x
+scl = fix . Scalar
 
 vecView :: String -> Int -> Expr
-vecView i s = () :< VectorView i s
+vecView i s = fix $ VectorView i s
 
 vec :: [Expr] -> Expr
-vec x = () :< Vector x
+vec x = fix $ Vector x
 
 add :: Expr -> Expr -> Expr
-add x y = () :< Addition x y
+add x y = fix $ Addition x y
 
 sub :: Expr -> Expr -> Expr
-sub x y = () :< Subtraction x y
+sub x y = fix $ Subtraction x y
 
 mul :: Expr -> Expr -> Expr
-mul x y = () :< Multiplication x y
+mul x y = fix $ Multiplication x y
 
 div :: Expr -> Expr -> Expr
-div x y = () :< Division x y
+div x y = fix $ Division x y
 
 app :: Expr -> Expr -> Expr
-app l i = () :< Apply l i
+app l i = fix $ Apply l i
 
 lam :: Expr -> Expr -> Expr
-lam (() :< Variable id t) b = () :< Lambda id t b
+lam (() :< Variable id t) b = fix $ Lambda id t b
 
 var :: String -> Type -> Expr
-var i t = () :< Variable i t
+var i t = fix $ Variable i t
 
 mkMap :: Expr -> Expr -> Expr
-mkMap l v = () :< Map l v
+mkMap l v = fix $ Map l v
 
 mkReduce :: Expr -> Expr -> Expr
-mkReduce l v = () :< Reduce l v
+mkReduce l v = fix $ Reduce l v
 
 mkZipWith :: Expr -> Expr -> Expr -> Expr
-mkZipWith l v1 v2 = () :< ZipWith l v1 v2
+mkZipWith l v1 v2 = fix $ ZipWith l v1 v2
 

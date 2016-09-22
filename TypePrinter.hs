@@ -15,5 +15,5 @@ typePrinterAlg (Power a b) = "(" ++ a ++ ")^(" ++ b ++ ")"
 
 typePrinterAlg (Arrow a b) = "(" ++ a ++ ")->(" ++ b ++ ")"
 
-instance Show Type where
-    show = cata2 typePrinterAlg
+showT :: Type -> String -- a sima Show overlap-el a Cofree Show-jával
+showT = cata typePrinterAlg

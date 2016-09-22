@@ -2,7 +2,7 @@
 
 module Type where
 
-import Utility (Fix(..))
+import Utility
 
 data TypeF a
     = Double
@@ -14,14 +14,14 @@ data TypeF a
 type Type = Fix TypeF
 
 double :: Type
-double = Fix Double
+double = fix Double
 
 size :: Int -> Type
-size = Fix . Size
+size = fix . Size
 
 power :: Type -> Type -> Type
-power x y = Fix $ Power x y
+power x y = fix $ Power x y
 
 arrow :: Type -> Type -> Type
-arrow x y = Fix $ Arrow x y
+arrow x y = fix $ Arrow x y
 

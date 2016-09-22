@@ -9,9 +9,6 @@ type Algebra f a = f a -> a
 cata :: Functor f => Algebra f a -> Cofree f i -> a
 cata alg = alg . fmap (cata alg) . unCofree
 
-cata2 :: Functor f => Algebra f a -> Fix f -> a
-cata2 alg = alg . fmap (cata2 alg) . unFix
-
 --type RAlgebra f a = f (Fix f, a) -> a
 
 --para :: Functor f => RAlgebra f a -> Fix f -> a  
