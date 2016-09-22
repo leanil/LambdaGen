@@ -16,4 +16,4 @@ typePrinterAlg (Power a b) = "(" ++ a ++ ")^(" ++ b ++ ")"
 typePrinterAlg (Arrow a b) = "(" ++ a ++ ")->(" ++ b ++ ")"
 
 instance Show Type where
-    show = cata typePrinterAlg
+    show = cata2 typePrinterAlg

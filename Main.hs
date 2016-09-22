@@ -8,4 +8,4 @@ import Recursion
 getError (Right e) = Just e
 getError _ = Nothing
 
-main = print $ getError $ cata typecheckAlg typeError9
+main = print $ getError $ cata typecheckAlg typeErrors

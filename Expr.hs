@@ -2,8 +2,9 @@
 
 module Expr where
 
-import Utility (Fix(..))
-import Type (Type)
+import Utility
+import Type
+
 import Control.Comonad.Cofree
 
 data ExprF a
@@ -15,58 +16,55 @@ data ExprF a
     | Multiplication { left :: a, right :: a }
     | Division { left :: a, right :: a }
     | Apply { lambda :: a, input :: a}
-    | Lambda { variable :: String, body :: a }
-    | Variable { id :: String }
+    | Lambda { varID :: String, varType :: Type, body :: a }
+    | Variable { id :: String, tp :: Type }
     | Map { lambda :: a, vector :: a }
     | Reduce { lambda :: a, vector :: a }
     | ZipWith { lambda :: a, vector1 :: a, vector2 :: a }
     deriving (Functor)
 
-data ExtF a = ExtF { operation :: ExprF a, exprType :: Type }
-instance Functor ExtF where
-    fmap f (ExtF o t) = ExtF (fmap f o) t
+--data ExtF a = ExtF { operation :: ExprF a, exprType :: Type }
+--instance Functor ExtF where
+--    fmap f (ExtF o t) = ExtF (fmap f o) t
 
-type Expr = Fix ExtF
-
-fop :: ExprF Expr -> Expr
-fop e = Fix ExtF { operation = e }
+type Expr = Cofree ExprF ()
 
 scl :: Double -> Expr
-scl = fop . Scalar
+scl x = () :< Scalar x
 
 vecView :: String -> Int -> Expr
-vecView i s = fop $ VectorView i s
+vecView i s = () :< VectorView i s
 
 vec :: [Expr] -> Expr
-vec = fop . Vector
+vec x = () :< Vector x
 
 add :: Expr -> Expr -> Expr
-add x y = fop $ Addition x y
+add x y = () :< Addition x y
 
 sub :: Expr -> Expr -> Expr
-sub x y = fop $ Subtraction x y
+sub x y = () :< Subtraction x y
 
 mul :: Expr -> Expr -> Expr
-mul x y = fop $ Multiplication x y
+mul x y = () :< Multiplication x y
 
 div :: Expr -> Expr -> Expr
-div x y = fop $ Division x y
+div x y = () :< Division x y
 
 app :: Expr -> Expr -> Expr
-app l i = fop $ Apply l i
+app l i = () :< Apply l i
 
 lam :: Expr -> Expr -> Expr
-lam (Fix (ExtF (Variable id) t)) b = Fix $ ExtF (Lambda id b) t
+lam (() :< Variable id t) b = () :< Lambda id t b
 
 var :: String -> Type -> Expr
-var i t = Fix ExtF { operation = Variable i, exprType = t }
+var i t = () :< Variable i t
 
 mkMap :: Expr -> Expr -> Expr
-mkMap l v = fop $ Map l v
+mkMap l v = () :< Map l v
 
 mkReduce :: Expr -> Expr -> Expr
-mkReduce l v = fop $ Reduce l v
+mkReduce l v = () :< Reduce l v
 
 mkZipWith :: Expr -> Expr -> Expr -> Expr
-mkZipWith l v1 v2 = fop $ ZipWith l v1 v2
+mkZipWith l v1 v2 = () :< ZipWith l v1 v2
 
