@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
 module TypePrinter where
+    
+import Data.Functor.Foldable
 
 import Recursion
 import Type

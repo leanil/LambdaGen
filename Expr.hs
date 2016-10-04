@@ -4,8 +4,8 @@ module Expr where
 
 import Utility
 import Type
-
 import Control.Comonad.Cofree
+import Data.Functor.Foldable
 
 data ExprF a
     = Scalar { getValue :: Double }
@@ -30,41 +30,41 @@ data ExprF a
 type Expr = Fix ExprF
 
 scl :: Double -> Expr
-scl = fix . Scalar
+scl = Fix . Scalar
 
 vecView :: String -> Int -> Expr
-vecView i s = fix $ VectorView i s
+vecView i s = Fix $ VectorView i s
 
 vec :: [Expr] -> Expr
-vec x = fix $ Vector x
+vec x = Fix $ Vector x
 
 add :: Expr -> Expr -> Expr
-add x y = fix $ Addition x y
+add x y = Fix $ Addition x y
 
 sub :: Expr -> Expr -> Expr
-sub x y = fix $ Subtraction x y
+sub x y = Fix $ Subtraction x y
 
 mul :: Expr -> Expr -> Expr
-mul x y = fix $ Multiplication x y
+mul x y = Fix $ Multiplication x y
 
 div :: Expr -> Expr -> Expr
-div x y = fix $ Division x y
+div x y = Fix $ Division x y
 
 app :: Expr -> Expr -> Expr
-app l i = fix $ Apply l i
+app l i = Fix $ Apply l i
 
 lam :: Expr -> Expr -> Expr
-lam (() :< Variable id t) b = fix $ Lambda id t b
+lam (Fix (Variable id t)) b = Fix $ Lambda id t b
 
 var :: String -> Type -> Expr
-var i t = fix $ Variable i t
+var i t = Fix $ Variable i t
 
 mkMap :: Expr -> Expr -> Expr
-mkMap l v = fix $ Map l v
+mkMap l v = Fix $ Map l v
 
 mkReduce :: Expr -> Expr -> Expr
-mkReduce l v = fix $ Reduce l v
+mkReduce l v = Fix $ Reduce l v
 
 mkZipWith :: Expr -> Expr -> Expr -> Expr
-mkZipWith l v1 v2 = fix $ ZipWith l v1 v2
+mkZipWith l v1 v2 = Fix $ ZipWith l v1 v2
 
