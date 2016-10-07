@@ -8,14 +8,14 @@ import Type
 import Typecheck
 import TypePrinter
 import Recursion
-
 import Control.Comonad.Cofree
 
-getError (b :< _) = b
---getError _ = Nothing
+getAnnotation (b :< _) = b
 
-test = funcTest5
+test = funcTest6
 
-main = case cata typecheckAlg test of
-    Left _ -> print $ getError $ para (attribute costEstAlg) test
-    Right errors -> print errors
+tc = cata (attrCata typecheckAlg) test
+
+main = case tc of
+    (Left _ :< _) -> print $ getAnnotation $ para (attrCofPara costEstAlg) $ cata extractTypeAlg tc
+    (Right errors :< _ ) -> print errors

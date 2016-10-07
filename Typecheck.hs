@@ -4,17 +4,15 @@ import Expr
 import Recursion
 import Type
 import TypePrinter
-
 import Control.Comonad.Cofree
-import Data.Functor.Foldable
-import Data.Bifunctor
 import Data.Either
+import Data.Functor.Foldable
 import Data.Maybe
 
 type Error = String
 type TypecheckT = Either Type [Error]
 
-typecheckAlg :: ExprF TypecheckT -> TypecheckT
+typecheckAlg :: Algebra Expr TypecheckT
 
 typecheckAlg (Scalar val) = Left double
 
@@ -77,8 +75,8 @@ typecheckAlg (Reduce a b) =
         ([ea, eb], []) -> reduceCheck ea eb
         (_, errors) -> Right $ concat errors
         where
-            reduceCheck (Fix (Arrow a (Fix (Arrow b c)))) v@(Fix (Power d s@(Fix (Size e))))
-                | a == b && a == c && a == d && e /= 0 = Left $ power d s
+            reduceCheck (Fix (Arrow a (Fix (Arrow b c)))) v@(Fix (Power d (Fix (Size e))))
+                | a == b && a == c && a == d && e /= 0 = Left a
                 | otherwise = Right $ catMaybes [eqCheck a b, eqCheck a c, eqCheck a d] ++
                     [showT v ++ " is an empty vector" | e == 0]
             reduceCheck a b = Right $ catMaybes [biLambdaCheck a, vectorCheck b]            
@@ -113,3 +111,7 @@ biLambdaCheck a = Just $ showT a ++ " not a binary lambda"
 vectorCheck :: Type ->  Maybe Error
 vectorCheck (Fix (Power _ _)) = Nothing
 vectorCheck a = Just $ showT a ++ " not a vector"
+
+extractTypeAlg :: Base (Cofree f TypecheckT) (Cofree f Type) -> Cofree f Type
+extractTypeAlg (MyPair (Left t, f)) = t :< f
+extractTypeAlg _ = error "use only on typechecked trees"

@@ -1,13 +1,12 @@
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
 module TypePrinter where
-    
-import Data.Functor.Foldable
 
 import Recursion
-import Type
+import Type    
+import Data.Functor.Foldable
 
-typePrinterAlg :: Algebra TypeF String
+typePrinterAlg :: Algebra Type String
 
 typePrinterAlg Double = "double"
 

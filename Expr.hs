@@ -2,7 +2,6 @@
 
 module Expr where
 
-import Utility
 import Type
 import Control.Comonad.Cofree
 import Data.Functor.Foldable
@@ -21,11 +20,7 @@ data ExprF a
     | Map { lambda :: a, vector :: a }
     | Reduce { lambda :: a, vector :: a }
     | ZipWith { lambda :: a, vector1 :: a, vector2 :: a }
-    deriving (Functor)
-
---data ExtF a = ExtF { operation :: ExprF a, exprType :: Type }
---instance Functor ExtF where
---    fmap f (ExtF o t) = ExtF (fmap f o) t
+    deriving (Functor, Show)
 
 type Expr = Fix ExprF
 
