@@ -15,14 +15,14 @@ import System.IO
 
 getAnnotation (b :< _) = b
 
-test = funcTest6
+test = funcTest8
 
 tc = cata (attrCata typecheckAlg) test
 
 main = case tc of
-    (Left _ :< _) -> writeFile "../test/result.cpp" $
+    (Left _ :< _) -> writeFile "../test/result.hpp" $
                         createEvaluator $ fst $ 
-                        cata (codeGenAlg 20) $
+                        cata (codeGenAlg 1000) $
                         para (attrCofPara costEstAlg) $
                         cata extractTypeAlg tc
                         

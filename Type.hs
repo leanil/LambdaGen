@@ -7,7 +7,7 @@ import Data.Functor.Foldable
 
 data TypeF a
     = Double
-    | Size { value :: Int }
+    | Dim { value :: Int }
     | Power { left :: a, right :: a }
     | Arrow { left :: a, right :: a }
     deriving (Eq, Show, Functor)
@@ -20,8 +20,8 @@ type Type = Fix TypeF
 double :: Type
 double = Fix Double
 
-size :: Int -> Type
-size = Fix . Size
+dim :: Int -> Type
+dim = Fix . Dim
 
 power :: Type -> Type -> Type
 power x y = Fix $ Power x y

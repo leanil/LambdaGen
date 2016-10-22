@@ -13,7 +13,8 @@ codeGenAlg :: Threshold -> Algebra (Cofree ExprF (Type, Cost)) CodeGenT
 
 codeGenAlg _ (MyPair (_, Scalar s)) = (show s, False)
 
-codeGenAlg _ (MyPair (_, VectorView id _)) = ("*bigVectors.at(\"" ++ id ++ "\")", False)
+codeGenAlg _ (MyPair (_, VectorView id d s)) = ("View<double," ++ sizes ++ ">(bigVectors.at(\"" ++ id ++ "\"))", False) where
+    sizes = intercalate "," $ zipWith (\x y -> "Pair<" ++ show x ++ "," ++ show y ++ ">") d s
 
 codeGenAlg _ (MyPair (_, Vector e)) = let (strs, bools) = unzip e in
     ("make_vector({" ++ intercalate "," strs ++ "})", or bools)

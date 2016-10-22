@@ -5,15 +5,16 @@ module Expr where
 import Type
 import Control.Comonad.Cofree
 import Data.Functor.Foldable
+import Data.List
 
 data ExprF a
     = Scalar { getValue :: Double }
-    | VectorView { id :: String, getSize :: Int }
-    | Vector { elements :: [a] }
     | Addition { left :: a, right :: a }
     | Subtraction { left :: a, right :: a }
     | Multiplication { left :: a, right :: a }
     | Division { left :: a, right :: a }
+    | VectorView { id :: String, dimensions :: [Int], strides :: [Int] }
+    | Vector { elements :: [a] }
     | Apply { lambda :: a, input :: a}
     | Lambda { varID :: String, varType :: Type, body :: a }
     | Variable { id :: String, tp :: Type }
@@ -27,12 +28,6 @@ type Expr = Fix ExprF
 scl :: Double -> Expr
 scl = Fix . Scalar
 
-vecView :: String -> Int -> Expr
-vecView i s = Fix $ VectorView i s
-
-vec :: [Expr] -> Expr
-vec x = Fix $ Vector x
-
 add :: Expr -> Expr -> Expr
 add x y = Fix $ Addition x y
 
@@ -44,6 +39,16 @@ mul x y = Fix $ Multiplication x y
 
 div :: Expr -> Expr -> Expr
 div x y = Fix $ Division x y
+
+vecView :: String -> [Int] -> Expr
+vecView i d = Fix $ VectorView i d (tail $ scanr (*) 1 d)
+
+transpose :: [Int] -> Expr -> Expr
+transpose p (Fix (VectorView i d s)) = Fix $ VectorView i (perm p d) (perm p s) where
+    perm p l = map snd $ sort $ zip p l
+    
+vec :: [Expr] -> Expr
+vec x = Fix $ Vector x
 
 app :: Expr -> Expr -> Expr
 app l i = Fix $ Apply l i

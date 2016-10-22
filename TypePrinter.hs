@@ -10,7 +10,7 @@ typePrinterAlg :: Algebra Type String
 
 typePrinterAlg Double = "double"
 
-typePrinterAlg (Size s) = show s
+typePrinterAlg (Dim s) = show s
 
 typePrinterAlg (Power a b) = "(" ++ a ++ ")^(" ++ b ++ ")"
 

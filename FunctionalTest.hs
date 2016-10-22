@@ -1,6 +1,7 @@
 module FunctionalTest where
 
 import Expr
+import LinAlg
 import Type
 
 x = var "x" double
@@ -31,25 +32,29 @@ funcTest5 =
             (scl 5))
         funcTest4
 
-v = var "v" (power double (size 3))
-
 funcTest6 =
     mkMap
-        (lam v
-            (mkReduce 
-                (lam x (lam y (add x y )))
-                (mkZipWith
-                    (lam x (lam y (mul x y )))
-                    v
-                    (vecView "vec" 3))))
-        (vec [
-            vec [scl 1, scl 2, scl 3],
-            vec [scl 4, scl 5, scl 6]])
+        (app (dotProd 3) (vecView "vec" [3]))
+        (vecView "mat" [2,3])
 
-a = vecView "a" 3
-b = vecView "b" 3
+funcTest6T =
+    mkReduce
+        (vecAdd 2)
+        (mkZipWith
+            (sclVecMul 2)
+            (vecView "vec" [3])
+            (transpose [2,1] $ vecView "mat" [2,3]))
+
+a = vecView "a" [3]
+b = vecView "b" [3]
 
 funcTest7 =
+    app (app (outerProd 3 3) a) b
+
+funcTest8 =
+    app (app (matMul 2 3 2) (transpose [2,1] $ vecView "mat" [2,3])) (vecView "mat" [3,2])
+
+funcTest9 =
     mkZipWith
         (lam x (lam y (add x y )))
         (mkMap

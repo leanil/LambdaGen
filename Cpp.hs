@@ -6,5 +6,5 @@ createEvaluator body =
     "\n" ++ signature ++ "{\n" ++
     "\treturn " ++ body ++ ";\n}\n"
     where
-        headers = ["\"helpers.h\"", "<map>", "<string>", "<vector>"]
-        signature = "std::vector<double> evaluator(std::map<std::string, std::vector<double>*> bigVectors)"
+        headers = ["\"helper.h\"", "\"View.h\"", "<map>", "<string>", "<vector>"]
+        signature = "auto evaluator(std::map<std::string, double*> bigVectors)"

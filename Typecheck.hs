@@ -18,7 +18,7 @@ typecheckAlg (Scalar val) = Left double
 
 typecheckAlg (Variable id t) = Left t
 
-typecheckAlg (VectorView id vSize) = Left $ power double (Type.size vSize)
+typecheckAlg (VectorView id d _) = Left $ foldr (flip power . dim) double d
 
 typecheckAlg (Vector elements) =
     case partitionEithers elements of
@@ -26,7 +26,7 @@ typecheckAlg (Vector elements) =
         (_, errors) -> Right $ concat errors
         where
             diffCheck types = case filter (/= head types) (tail types) of
-                []   -> Left $ power (head types) (size $ length types)
+                []   -> Left $ power (head types) (dim $ length types)
                 diff -> Right $ mapMaybe (eqCheck (head types)) diff    
 
 typecheckAlg (Addition a b) =
@@ -75,7 +75,7 @@ typecheckAlg (Reduce a b) =
         ([ea, eb], []) -> reduceCheck ea eb
         (_, errors) -> Right $ concat errors
         where
-            reduceCheck (Fix (Arrow a (Fix (Arrow b c)))) v@(Fix (Power d (Fix (Size e))))
+            reduceCheck (Fix (Arrow a (Fix (Arrow b c)))) v@(Fix (Power d (Fix (Dim e))))
                 | a == b && a == c && a == d && e /= 0 = Left a
                 | otherwise = Right $ catMaybes [eqCheck a b, eqCheck a c, eqCheck a d] ++
                     [showT v ++ " is an empty vector" | e == 0]
