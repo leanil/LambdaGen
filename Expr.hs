@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, FlexibleInstances, TypeSynonymInstances #-} --ezek mik?
+{-# LANGUAGE DataKinds, DeriveFunctor, FlexibleInstances, TypeSynonymInstances #-}
 
 module Expr where
 
@@ -6,6 +6,7 @@ import Type
 import Control.Comonad.Cofree
 import Data.Functor.Foldable
 import Data.List
+import Data.Vinyl
 
 data ExprF a
     = Scalar { getValue :: Double }
@@ -23,48 +24,51 @@ data ExprF a
     | ZipWith { lambda :: a, vector1 :: a, vector2 :: a }
     deriving (Functor, Show)
 
-type Expr = Fix ExprF
+type Expr = Cofree ExprF (HList '[])
+
+wrapExprF :: ExprF Expr -> Expr
+wrapExprF = (RNil :<)
 
 scl :: Double -> Expr
-scl = Fix . Scalar
+scl = wrapExprF . Scalar
 
 add :: Expr -> Expr -> Expr
-add x y = Fix $ Addition x y
+add x y = wrapExprF $ Addition x y
 
 sub :: Expr -> Expr -> Expr
-sub x y = Fix $ Subtraction x y
+sub x y = wrapExprF $ Subtraction x y
 
 mul :: Expr -> Expr -> Expr
-mul x y = Fix $ Multiplication x y
+mul x y = wrapExprF $ Multiplication x y
 
 div :: Expr -> Expr -> Expr
-div x y = Fix $ Division x y
+div x y = wrapExprF $ Division x y
 
 vecView :: String -> [Int] -> Expr
-vecView i d = Fix $ VectorView i d (tail $ scanr (*) 1 d)
+vecView i d = wrapExprF $ VectorView i d (tail $ scanr (*) 1 d)
 
 transpose :: [Int] -> Expr -> Expr
-transpose p (Fix (VectorView i d s)) = Fix $ VectorView i (perm p d) (perm p s) where
+transpose p (_ :< VectorView i d s) = wrapExprF $ VectorView i (perm p d) (perm p s) where
     perm p l = map snd $ sort $ zip p l
     
 vec :: [Expr] -> Expr
-vec x = Fix $ Vector x
+vec x = wrapExprF $ Vector x
 
 app :: Expr -> Expr -> Expr
-app l i = Fix $ Apply l i
+app l i = wrapExprF $ Apply l i
 
 lam :: Expr -> Expr -> Expr
-lam (Fix (Variable id t)) b = Fix $ Lambda id t b
+lam (_ :< Variable id t) b = wrapExprF $ Lambda id t b
 
 var :: String -> Type -> Expr
-var i t = Fix $ Variable i t
+var i t = wrapExprF $ Variable i t
 
 mkMap :: Expr -> Expr -> Expr
-mkMap l v = Fix $ Map l v
+mkMap l v = wrapExprF $ Map l v
 
 mkReduce :: Expr -> Expr -> Expr
-mkReduce l v = Fix $ Reduce l v
+mkReduce l v = wrapExprF $ Reduce l v
 
 mkZipWith :: Expr -> Expr -> Expr -> Expr
-mkZipWith l v1 v2 = Fix $ ZipWith l v1 v2
+mkZipWith l v1 v2 = wrapExprF $ ZipWith l v1 v2
 

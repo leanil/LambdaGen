@@ -1,26 +1,31 @@
+{-# LANGUAGE DataKinds, FlexibleContexts, TypeOperators #-}
+
 module Typecheck where
 
 import Expr
 import Recursion
 import Type
 import TypePrinter
-import Control.Comonad.Cofree
+import Control.Comonad.Cofree (Cofree ((:<)))
 import Data.Either
+import Data.Either.Combinators (fromLeft')
 import Data.Functor.Foldable
 import Data.Maybe
+import Data.Vinyl
+import Data.Vinyl.Functor
 
 type Error = String
 type TypecheckT = Either Type [Error]
 
-typecheckAlg :: Algebra Expr TypecheckT
+typecheckAlg :: Algebra (Cofree ExprF (R fields)) TypecheckT
 
-typecheckAlg (Scalar val) = Left double
+typecheckAlg (_ ::< Scalar val) = Left double
 
-typecheckAlg (Variable id t) = Left t
+typecheckAlg (_ ::< Variable id t) = Left t
 
-typecheckAlg (VectorView id d _) = Left $ foldr (flip power . dim) double d
+typecheckAlg (_ ::< VectorView id d _) = Left $ foldr (flip power . dim) double d
 
-typecheckAlg (Vector elements) =
+typecheckAlg (_ ::< Vector elements) =
     case partitionEithers elements of
         (t, []) -> diffCheck t
         (_, errors) -> Right $ concat errors
@@ -29,7 +34,7 @@ typecheckAlg (Vector elements) =
                 []   -> Left $ power (head types) (dim $ length types)
                 diff -> Right $ mapMaybe (eqCheck (head types)) diff    
 
-typecheckAlg (Addition a b) =
+typecheckAlg (_ ::< Addition a b) =
     case partitionEithers [a, b] of
         ([ea, eb], []) -> addCheck ea eb
         (_, errors) -> Right $ concat errors
@@ -37,7 +42,7 @@ typecheckAlg (Addition a b) =
             addCheck (Fix Double) (Fix Double) = Left double
             addCheck a b = Right $ mapMaybe scalarCheck (filter (/= double) [a, b])
                       
-typecheckAlg (Multiplication a b) =
+typecheckAlg (_ ::< Multiplication a b) =
     case partitionEithers [a, b] of
         ([ea, eb], []) -> mulCheck ea eb
         (_, errors) -> Right $ concat errors
@@ -45,7 +50,7 @@ typecheckAlg (Multiplication a b) =
             mulCheck (Fix Double) (Fix Double) = Left double
             mulCheck a b = Right $ mapMaybe scalarCheck (filter (/= double) [a, b])
 
-typecheckAlg (Apply a b) =
+typecheckAlg (_ ::< Apply a b) =
     case partitionEithers [a, b] of
         ([ea, eb], []) -> applyCheck ea eb
         (_, errors) -> Right $ concat errors
@@ -55,12 +60,12 @@ typecheckAlg (Apply a b) =
                 | otherwise = Right $ catMaybes [eqCheck a c]
             applyCheck a _ = Right $ catMaybes [lambdaCheck a]
 
-typecheckAlg (Lambda id t b) =
+typecheckAlg (_ ::< Lambda id t b) =
     case partitionEithers [b] of
         ([eb], []) -> Left $ arrow t eb
         (_, errors) -> Right $ concat errors
         
-typecheckAlg (Map a b) =
+typecheckAlg (_ ::< Map a b) =
     case partitionEithers [a, b] of
         ([ea, eb], []) -> mapCheck ea eb
         (_, errors) -> Right $ concat errors
@@ -70,7 +75,7 @@ typecheckAlg (Map a b) =
                 | otherwise = Right $ catMaybes [eqCheck a c]
             mapCheck a b = Right $ catMaybes [lambdaCheck a, vectorCheck b]
 
-typecheckAlg (Reduce a b) =
+typecheckAlg (_ ::< Reduce a b) =
     case partitionEithers [a, b] of
         ([ea, eb], []) -> reduceCheck ea eb
         (_, errors) -> Right $ concat errors
@@ -81,7 +86,7 @@ typecheckAlg (Reduce a b) =
                     [showT v ++ " is an empty vector" | e == 0]
             reduceCheck a b = Right $ catMaybes [biLambdaCheck a, vectorCheck b]            
 
-typecheckAlg (ZipWith a b c) =
+typecheckAlg (_ ::< ZipWith a b c) =
     case partitionEithers [a, b, c] of
         ([ea, eb, ec], []) -> zipCheck ea eb ec
         (_, errors) -> Right $ concat errors
@@ -112,6 +117,5 @@ vectorCheck :: Type ->  Maybe Error
 vectorCheck (Fix (Power _ _)) = Nothing
 vectorCheck a = Just $ showT a ++ " not a vector"
 
-extractTypeAlg :: Base (Cofree f TypecheckT) (Cofree f Type) -> Cofree f Type
-extractTypeAlg (MyPair (Left t, f)) = t :< f
-extractTypeAlg _ = error "use only on typechecked trees"
+getType :: TypecheckT ∈ fields => R fields -> Type
+getType = fromLeft' . getIdentity . rget ([] :: [TypecheckT])

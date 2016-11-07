@@ -1,5 +1,3 @@
-import Data.Functor.Foldable
-
 import CodeGeneration
 import CostEstimation
 import Cpp
@@ -9,21 +7,19 @@ import FunctionalTest
 import Recursion
 import Type
 import Typecheck
-import TypePrinter
-import Control.Comonad.Cofree
-import System.IO
+import Control.Comonad (extract)
+import Data.Functor.Foldable (cata, para)
+import System.IO (print)
 
-getAnnotation (b :< _) = b
+test = funcTest6
 
-test = funcTest8
+tc = cata (annotate typecheckAlg) test
 
-tc = cata (attrCata typecheckAlg) test
-
-main = case tc of
-    (Left _ :< _) -> writeFile "../test/result.hpp" $
-                        createEvaluator $ fst $ 
-                        cata (codeGenAlg 1000) $
-                        para (attrCofPara costEstAlg) $
-                        cata extractTypeAlg tc
+main =
+    case fieldVal ([] :: [TypecheckT]) $ extract tc of
+    (Left _) -> writeFile "../test/result.hpp" $
+                createEvaluator $ getCode $ extract $ 
+                cata (annotate $ codeGenAlg 1000) $
+                para (annotatePara costEstAlg) tc
                         
-    (Right errors :< _ ) -> print errors
+    (Right errors) -> print errors
