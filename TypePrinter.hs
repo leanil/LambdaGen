@@ -18,3 +18,15 @@ typePrinterAlg (Arrow a b) = "(" ++ a ++ ")->(" ++ b ++ ")"
 
 showT :: Type -> String -- a sima Show overlap-el a Cofree Show-jával
 showT = cata typePrinterAlg
+
+dimCounterAlg :: Algebra Type [Int]
+
+dimCounterAlg (Dim s) = [s]
+
+dimCounterAlg (Power a b) = head b : a
+
+dimCounterAlg _ = []
+
+countDims :: Type -> [Int]
+countDims = cata dimCounterAlg
+

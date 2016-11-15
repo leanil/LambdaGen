@@ -45,7 +45,7 @@ div :: Expr -> Expr -> Expr
 div x y = wrapExprF $ Division x y
 
 vecView :: String -> [Int] -> Expr
-vecView i d = wrapExprF $ VectorView i d (tail $ scanr (*) 1 d)
+vecView i d = wrapExprF $ VectorView i d (defaultStrides d)
 
 transpose :: [Int] -> Expr -> Expr
 transpose p (_ :< VectorView i d s) = wrapExprF $ VectorView i (perm p d) (perm p s) where
@@ -72,3 +72,5 @@ mkReduce l v = wrapExprF $ Reduce l v
 mkZipWith :: Expr -> Expr -> Expr -> Expr
 mkZipWith l v1 v2 = wrapExprF $ ZipWith l v1 v2
 
+defaultStrides :: [Int] -> [Int]
+defaultStrides = tail . scanr (*) 1
