@@ -15,84 +15,79 @@ import Data.Functor.Foldable (ana)
 import System.Random
 
 type AssignStgT = (StdGen, Bool)
-type ResultId = Maybe Int
+type ResultStg = Maybe Int
 
-assignStgAlg :: TypecheckT ∈ fields => CoAlgebra (Cofree ExprF (R (ResultId ': fields))) ((Cofree ExprF (R fields)), AssignStgT)
+assignStgAlg :: TypecheckT ∈ fields => CoAlgebra (Cofree ExprF (R (ResultStg ': fields))) ((Cofree ExprF (R fields)), AssignStgT)
 
-assignStgAlg (r :< Scalar s, _) = (Identity Nothing :& r) ::< Scalar s
+assignStgAlg (r :< Scalar x, s) = (Identity (snd $ assignHelper s r) :& r) ::< Scalar x
 
-assignStgAlg (r :< VectorView id d s, _) = (Identity Nothing :& r) ::< VectorView id d s
+assignStgAlg (r :< VectorView a b c, s) = (Identity (snd $ assignHelper s r) :& r) ::< VectorView a b c
 
-assignStgAlg (r :< Vector elements, (g,_)) = (Identity Nothing :& r) ::< (Vector $ zip elements (map (,True) $ unfoldr (Just . split) g))
+assignStgAlg (r :< Vector elements, s) = (Identity s' :& r) ::< (Vector $ zip elements (map (,True) $ unfoldr (Just .split) g'))where
+    (g', s') = assignHelper s r
 
-assignStgAlg (r :< Addition a b, (g,_)) = (Identity Nothing :& r) ::< Addition (a,(g1,True)) (b,(g2,True)) where
-    (g1, g2) = split g
+assignStgAlg (r :< Addition a b, s) = (Identity s' :& r) ::< Addition (a,(g1,True)) (b,(g2,True)) where
+    (g', s') = assignHelper s r
+    (g1, g2) = split g'
 
-assignStgAlg (r :< Multiplication a b, (g,_)) = (Identity Nothing :& r) ::< Multiplication (a,(g1,True)) (b,(g2,True)) where
-    (g1, g2) = split g  
+assignStgAlg (r :< Multiplication a b, s) = (Identity s' :& r) ::< Multiplication (a,(g1,True)) (b,(g2,True)) where
+    (g', s') = assignHelper s r
+    (g1, g2) = split g'
 
-assignStgAlg (r :< Apply a b, (g,s)) = (Identity (if s then Just x else Nothing) :& r) ::< 
-    Apply (a,(g1,False)) (b,(g2,True)) where
-        (x,g') = next g
+assignStgAlg (r :< Apply a b, s) = (Identity s' :& r) ::< Apply (a,(g1,False)) (b,(g2,True)) where
+    (g', s') = assignHelper s r
+    (g1, g2) = split g'
+
+assignStgAlg (r :< Lambda i t a, s) = (Identity Nothing :& r) ::< Lambda i t (a,s)
+
+assignStgAlg (r :< Variable i t, s) = (Identity (snd $ assignHelper s r) :& r) ::< Variable i t
+
+assignStgAlg (r :< Map a b, s) = (Identity s' :& r) ::< Map (a,(g1,False)) (b,(g2,True)) where
+        (g', s') = assignHelper s r
         (g1, g2) = split g'
 
-assignStgAlg (r :< Lambda i t a, (g,s)) = (Identity Nothing :& r) ::< Lambda i t (a,(g,s))
-
-assignStgAlg (r :< Variable i t, _) = (Identity Nothing :& r) ::< Variable i t
-
-assignStgAlg (r :< Map a b, (g,s)) = (Identity (if s then Just x else Nothing) :& r) ::< 
-    Map (a,(g1,False)) (b,(g2,True)) where
-        (x,g') = next g
+assignStgAlg (r :< Reduce a b, s) = (Identity s' :& r) ::< Reduce (a,(g1,False)) (b,(g2,True)) where
+        (g', s') = assignHelper s r
         (g1, g2) = split g'
 
-assignStgAlg (r :< Reduce a b, (g,s)) = (Identity (if s then Just x else Nothing) :& r) ::< 
-    Reduce (a,(g1,False)) (b,(g2,True)) where
-        (x,g') = next g
-        (g1, g2) = split g'
-
-assignStgAlg (r :< ZipWith a b c, (g,s)) = (Identity (if s then Just x else Nothing) :& r) ::< 
-    ZipWith (a,(g1,False)) (b,(g2,True)) (c,(g3,True)) where
-        (x,g') = next g
+assignStgAlg (r :< ZipWith a b c, s) = (Identity s' :& r) ::< ZipWith (a,(g1,False)) (b,(g2,True)) (c,(g3,True)) where
+        (g', s') = assignHelper s r
         (g1, (g2, g3)) = fmap split $ split g'
 
-assignStorage :: TypecheckT ∈ fields => Cofree ExprF (R fields) -> Cofree ExprF (R (ResultId ': fields))
+assignHelper :: TypecheckT ∈ fields => AssignStgT -> R fields -> (StdGen, ResultStg)
+assignHelper (g, False) _ = (g, Nothing)
+assignHelper (g, True) (getType -> t) = (g', Just x) where
+    (x, g') = next g
+
+assignStorage :: TypecheckT ∈ fields => Cofree ExprF (R fields) -> Cofree ExprF (R (ResultStg ': fields))
 assignStorage e = ana assignStgAlg (e,(mkStdGen 0, True))
 
 type ResultPack = [(Int,[Int],[Int])]
 
-collectStgAlg :: (ResultId ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
+collectStgAlg :: (ResultStg ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
 
-collectStgAlg (_ ::< Scalar{}) = []
+collectStgAlg (r ::< Scalar{}) = getStgAndDims r
 
-collectStgAlg (_ ::< VectorView{}) = []
+collectStgAlg (r ::< VectorView{}) = getStgAndDims r
 
-collectStgAlg (_ ::< Vector elements) = concat elements
+collectStgAlg (r ::< Vector elements) = getStgAndDims r ++ concat elements
 
-collectStgAlg (_ ::< Addition a b) = a ++ b
+collectStgAlg (r ::< Addition a b) = getStgAndDims r ++ a ++ b
 
-collectStgAlg (_ ::< Multiplication a b) = a ++ b
+collectStgAlg (r ::< Multiplication a b) = getStgAndDims r ++  a ++ b
 
-collectStgAlg ((fieldVal ([] :: [ResultId]) &&& countDims . getType -> (Just x, ds)) ::< Apply a b) =
-     (x, ds, defaultStrides ds) : a ++ b
+collectStgAlg (r ::< Apply a b) = getStgAndDims r ++ a ++ b
 
-collectStgAlg (_ ::< Apply a b) = a ++ b
+collectStgAlg (r ::< Lambda _ _ a) = getStgAndDims r ++ a
 
-collectStgAlg (_ ::< Lambda _ _ a) = a
+collectStgAlg (r ::< Variable{}) = getStgAndDims r
 
-collectStgAlg (_ ::< Variable{}) = []
-
-collectStgAlg ((fieldVal ([] :: [ResultId]) &&& countDims . getType -> (Just x, ds)) ::< Map a b) =
-     (x, ds, defaultStrides ds) : a ++ b
-
-collectStgAlg (_ ::< Map a b) = a ++ b
-
-collectStgAlg ((fieldVal ([] :: [ResultId]) &&& countDims . getType -> (Just x, ds)) ::< Reduce a b) =
-     (x, ds, defaultStrides ds) : a ++ b
+collectStgAlg (r ::< Map a b) = getStgAndDims r ++ a ++ b
     
-collectStgAlg (_ ::< Reduce a b) = a ++ b
+collectStgAlg (r ::< Reduce a b) = getStgAndDims r ++ a ++ b
 
-collectStgAlg ((fieldVal ([] :: [ResultId]) &&& countDims . getType -> (Just x, ds)) ::< ZipWith a b c) =
-     (x, ds, defaultStrides ds) : a ++ b ++ c
+collectStgAlg (r ::< ZipWith a b c) = getStgAndDims r ++ a ++ b ++ c
 
-collectStgAlg (_ ::< ZipWith a b c) = a ++ b ++ c
-
+getStgAndDims :: (TypecheckT ∈ fields, ResultStg ∈ fields) => R (fields) -> ResultPack
+getStgAndDims (fieldVal ([] :: [ResultStg]) &&& countDims . getType -> (Just x, ds)) = [(x, ds, defaultStrides ds)]
+getStgAndDims (fieldVal ([] :: [ResultStg]) &&& countDims . getType -> (Nothing, _)) = []

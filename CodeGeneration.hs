@@ -16,65 +16,70 @@ import Data.Vinyl.Functor
 
 type Threshold = Int
 type CodeGenT = (String, Bool)
-codeGenAlg :: (TypecheckT ∈ fields, Cost ∈ fields, ResultId ∈ fields) => Threshold -> Algebra (Cofree ExprF (R fields)) CodeGenT
+codeGenAlg :: (TypecheckT ∈ fields, Cost ∈ fields, ResultStg ∈ fields) => Threshold -> RAlgebra (Cofree ExprF (R fields)) CodeGenT
 
-codeGenAlg _ (_ ::< Scalar s) = (show s, False)
+codeGenAlg _ (r ::< Scalar s) = (getName r ++ "=" ++ show s, False)
 
-codeGenAlg _ (_ ::< VectorView id d s) = ("View<double," ++ sizes d s ++ ">(bigVectors.at(\"" ++ id ++ "\"))", False)
+codeGenAlg _ (r ::< VectorView id d s) = (getName r ++ "=bigVectors.at(\"" ++ id ++ "\")", False)
 
-codeGenAlg _ (_ ::< Vector e) = let (strs, bools) = unzip e in
-    ("make_vector({" ++ intercalate "," strs ++ "})", or bools)
+-- codeGenAlg _ (r ::< Vector e) = let (strs, bools) = unzip $ snd $ unzip e in
+--     ("make_vector({" ++ intercalate "," strs ++ "})", or bools)
 
-codeGenAlg _ (_ ::< Addition (af,as) (bf,bs)) =
-    ("(" ++ af ++ ")+(" ++ bf ++ ")", as || bs)
+codeGenAlg _ (r ::< Addition (ra :< _, (af,as)) (rb :< _,(bf,bs))) =
+    (af ++ ",\n" ++ bf ++ ",\n" ++
+    getName r ++ "=" ++ getName ra ++ "+" ++ getName rb, as || bs)
 
-codeGenAlg _ (_ ::< Multiplication (af,as) (bf,bs)) =
-    ("(" ++ af ++ ")*(" ++ bf ++ ")", as || bs)
+codeGenAlg _ (r ::< Multiplication (ra :< _, (af,as)) (rb :< _,(bf,bs))) =
+    (af ++ ",\n" ++ bf ++ ",\n" ++
+    getName r ++ "=" ++ getName ra ++ "*" ++ getName rb, as || bs)
 
-codeGenAlg _ (r ::< Apply (af,as) (bf,bs)) =
-    (af ++ "(" ++ bf ++ ")" ++ storage r, as || bs) where
-        storage (getType -> Fix Arrow{})                 = ""
-        storage (fieldVal ([] :: [ResultId]) -> Just x)  = "(s" ++ show x ++ ")"
-        storage (fieldVal ([] :: [ResultId]) -> Nothing) = "(result)"
+codeGenAlg _ (r ::< Apply (_,(af,as)) (rb :< _,(bf,bs))) = (decorate r $ bf ++ ",\n" ++ af ++ "(" ++ getName rb ++ ")", as || bs) where
+    decorate (getType -> Fix Arrow{}) s = '(' : s ++ ")"
+    decorate _                        s = s ++ "(" ++ getName r ++ ")"
 
-codeGenAlg _ (t ::< Lambda id _ (af,as)) =
-    ("[&](const auto& " ++ id ++ "){return " ++ getBody af t ++ ";}", as) where
+codeGenAlg _ (r ::< Lambda id _ (_,(af,as))) =
+    ("[&](const auto& " ++ id ++ "){return\n" ++ getBody af r ++ ";}", as) where
      getBody s (getType -> (Fix (Arrow _ (Fix Arrow{})))) = s
-     getBody s (getType -> (Fix (Arrow _ (Fix Double)))) = "[&](auto&& result){result=" ++ s ++ ";}"
-     getBody s _ = "[&](auto&& result){" ++ s ++ ";}"
+     --getBody s (getType -> (Fix (Arrow _ (Fix Double)))) = "[&](auto&& result){result=" ++ s ++ ",}"
+     getBody s _ = "[&](auto&& result){\n" ++ s ++ ";}"
 
-codeGenAlg _ (_ ::< Variable id _) = (id, False)
+codeGenAlg _ (r ::< Variable id _) = (getName r ++ "=" ++ id, False)
 
-codeGenAlg t (c ::< Map (af,as) (bf,bs)) =
-    (par ++ "Map(" ++ af ++ "," ++ bf ++ "," ++ storage c ++ ")", b) where
-        b = t > 0 && getCost c > t
+codeGenAlg t (r ::< Map (_,(af,as)) (rb :< _,(bf,bs))) =
+    (bf ++ ",\n" ++ par ++ "Map(" ++ af ++ "," ++ getName rb ++ "," ++ getName r ++ ")", b) where
+        b = t > 0 && getCost r > t
         par = if b && not (as || bs) then "Par" else ""
-        storage (fieldVal ([] :: [ResultId]) -> Just x) = "s" ++ show x
-        storage (fieldVal ([] :: [ResultId]) -> Nothing) = "result"
 
-codeGenAlg t (c ::< Reduce (af,as) (bf,bs)) =
-    (par ++ "Reduce(" ++ af ++ "," ++ bf ++ "," ++ storage c ++ ")", b) where
-        b = t > 0 && getCost c > t
+codeGenAlg t (r ::< Reduce (_,(af,as)) (rb :< _,(bf,bs))) =
+    (bf ++ ",\n" ++ par ++ "Reduce(" ++ af ++ "," ++ getName rb ++ "," ++ getName r ++ ")", b) where
+        b = t > 0 && getCost r > t
         par = if b && not (as || bs) then "Par" else ""
-        storage (fieldVal ([] :: [ResultId]) -> Just x) = "s" ++ show x
-        storage (fieldVal ([] :: [ResultId]) -> Nothing) = "result"
 
-codeGenAlg t (c ::< ZipWith (af,as) (bf,bs) (cf,cs)) =
-    (par ++ "Zip(" ++ intercalate "," [af,bf,cf] ++ "," ++ storage c ++ ")", b) where
-        b = t > 0 && getCost c > t
+codeGenAlg t (r ::< ZipWith (_,(af,as)) (rb :< _,(bf,bs)) (rc :< _,(cf,cs))) =
+    (bf ++ ",\n" ++ cf ++ ",\n" ++ par ++ "Zip(" ++ af ++ "," ++ intercalate "," (map getName [rb, rc, r]) ++ ")", b) where
+        b = t > 0 && getCost r > t
         par = if b && not (as || bs || cs) then "Par" else ""
-        storage (fieldVal ([] :: [ResultId]) -> Just x) = "s" ++ show x
-        storage (fieldVal ([] :: [ResultId]) -> Nothing) = "result"
 
-getCode :: (CodeGenT ∈ fields, ResultPack ∈ fields) => R fields -> String
+-- getDecl :: (ResultStg ∈ fields) => R fields -> String
+-- getDecl (fieldVal ([] :: [ResultStg]) -> Just (d,s,x)) = "View<double" ++ sizes d s ++ "> s" ++ show x
+-- getDecl (fieldVal ([] :: [ResultStg]) -> Nothing) = ""
+
+-- getFullDecl :: (ResultStg ∈ fields) => R fields -> String
+-- getFullDecl (getDecl -> x) = if x == "" then "" else x ++ ",\n"
+
+getName :: (ResultStg ∈ fields) => R fields -> String
+getName (fieldVal ([] :: [ResultStg]) -> Just x) = 's' : show x
+getName (fieldVal ([] :: [ResultStg]) -> Nothing) = "result"
+
+getCode :: (CodeGenT ∈ fields, ResultStg ∈ fields, ResultPack ∈ fields) => R fields -> String
 getCode r =
     preAlloc (fieldVal ([] :: [ResultPack]) r) ++
-    fst (fieldVal ([] :: [CodeGenT]) r) ++  ";\n" ++ 
-    let sel1 (a,_,_) = a in
-    "return s" ++ show (sel1 $ head $ fieldVal ([] :: [ResultPack]) r) ++ ";\n"
+    fst (fieldVal ([] :: [CodeGenT]) r) ++ ";\n" ++
+    "return " ++ getName r ++ ";\n"
 
 preAlloc :: ResultPack -> String
-preAlloc = concatMap (\(id, d, s) -> "View<double," ++ sizes d s++ "> s" ++ show id ++ ";\n")
+preAlloc = concatMap (\(id, d, s) -> "View<double" ++ sizes d s++ "> s" ++ show id ++ ";\n")
 
 sizes :: [Int] -> [Int] -> String
-sizes d s = intercalate "," $ zipWith (\x y -> "Pair<" ++ show x ++ "," ++ show y ++ ">") d s
+sizes [] [] = ""
+sizes d s = "," ++ intercalate "," (zipWith (\x y -> "Pair<" ++ show x ++ "," ++ show y ++ ">") d s)

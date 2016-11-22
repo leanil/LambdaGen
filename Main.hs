@@ -14,7 +14,7 @@ import Control.Comonad (extract)
 import Data.Functor.Foldable (cata, para)
 import System.IO (print)
 
-test = funcTest6
+test = funcTest8
 
 tc = cata (annotate typecheckAlg) test
 
@@ -22,7 +22,7 @@ main =
     case fieldVal ([] :: [TypecheckT]) $ extract tc of
     (Left _) -> writeFile "../test/result.hpp" $
                 createEvaluator $ getCode $ extract $
-                cata (annotate $ codeGenAlg 1000) $
+                para (annotatePara $ codeGenAlg 1000) $
                 cata (annotate collectStgAlg) $
                 assignStorage $
                 para (annotatePara costEstAlg) tc
