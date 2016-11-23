@@ -57,7 +57,11 @@ ostream& operator<<(ostream& out, const View<T, D1, Dims...>& v) {
 template<typename T>
 class View<T> {
 public:
+	View() : loc{ new T } {}
+
 	View(T* loc) : loc{ loc } {}
+
+	View(double d) : View(new double{ d }) {}
 
 	View<T>& operator=(const View<T>& x) {
 		*loc = *x.loc;
