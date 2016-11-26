@@ -42,8 +42,8 @@ outerProd a b = let x  = var "x" double
                             v1))
 
 matAdd :: Int -> Int -> Expr
-matAdd a b = let m1 = var "m1" (power (power double (dim a)) (dim b))
-                 m2 = var "m2" (power (power double (dim a)) (dim b))
+matAdd a b = let m1 = var "m1" (power (power double (dim b)) (dim a))
+                 m2 = var "m2" (power (power double (dim b)) (dim a))
              in  lam m1 (lam m2 (mkZipWith (vecAdd b) m1 m2))
 
 matMul :: Int -> Int -> Int -> Expr

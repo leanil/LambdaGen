@@ -33,12 +33,16 @@ public:
 	View(T* loc) : loc{ loc } {}
 
 	void operator=(const View<T, D1, Dims...>& x) {
+		loc = x.loc;
+	}
+
+	void copy(const View<T, D1, Dims...>& x) {
 		for (size_t i = 0; i < D1::dim; ++i) {
-			(*this)[i] = x[i];
+			(*this)[i].copy(x[i]);
 		}
 	}
 
-	auto operator[](unsigned idx) const {
+	auto operator[](size_t idx) const {
 		return View<T, Dims...>(loc + idx*D1::stride);
 	}
 private:
@@ -68,6 +72,10 @@ public:
 		return *this;
 	}
 
+	void copy(double d) {
+		*loc = d;
+	}
+
 	T& operator=(const T& x) { return *loc = x; }
 
 	operator T() const { return *loc; }
@@ -85,11 +93,11 @@ ostream& operator<<(ostream& out, const View<T>& v) {
 
 template<typename T, size_t D1>
 struct ViewComposer {
-	using type = View<T, Pair<D1,1>>;
+	using type = View<T, Pair<D1, 1>>;
 };
 
 template<typename T, size_t D1, typename... Dims>
 struct ViewComposer<View<T, Dims...>, D1> {
-	using type = View<T, Pair<D1,Size<Dims...>::result>, Dims...>;
+	using type = View<T, Pair<D1, Size<Dims...>::result>, Dims...>;
 };
 

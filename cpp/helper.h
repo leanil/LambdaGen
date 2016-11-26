@@ -45,11 +45,12 @@ void ParMap(const F& f, const View<A, Pair<D1, S1>, DA...>& v, View<B, Pair<D1, 
 	for (thread& t : threads) {
 		t.join();
 	}
+	//cout << "ParMap " << v << " = " << result << endl;
 }
 
 template<typename F, typename A, typename B, typename D1, typename... DA, typename... DB>
 void Reduce(const F& f, const View<A, D1, DA...>& v, View<B, DB...>& result) {
-	result = v[0];
+	result.copy(v[0]);
 	for (size_t i = 1; i < D1::dim; ++i) {
 		f(result)(v[i])(result);
 	}
@@ -64,11 +65,11 @@ void ParReduce(const F& f, const View<A, D1, DA...>& v, View<B, DB...>& result, 
 	size_t batch = batch_size(D1::dim, thread_num);
 	for (unsigned thread_id = 0; thread_id < thread_num; ++thread_id) {
 		threads.push_back(thread([&, thread_id] () {
-			for (size_t i = thread_id*batch; i < min((thread_id + 1)*batch, D1::dim); ++i) {
-				if (i == thread_id*batch)
-					temp[thread_id] = v[i];
-				else
-					f(temp[thread_id])(v[i])(temp[thread_id], thread_id);
+			if (thread_id*batch < D1::dim) {
+				temp[thread_id].copy(v[thread_id*batch]);
+			}
+			for (size_t i = thread_id*batch + 1; i < min((thread_id + 1)*batch, D1::dim); ++i) {
+				f(temp[thread_id])(v[i])(temp[thread_id], thread_id);
 			}
 		}));
 	}
@@ -76,9 +77,10 @@ void ParReduce(const F& f, const View<A, D1, DA...>& v, View<B, DB...>& result, 
 		t.join();
 	}
 	result = temp[0];
-	for (size_t i = 1; i < thread_num; ++i) {
+	for (size_t i = 1; i*batch < D1::dim; ++i) {
 		f(result)(temp[i])(result, 0);
 	}
+	//cout << "ParReduce " << v << " = " << result << endl;
 }
 
 template<typename F, typename A, typename B, typename C, size_t D1, size_t S1A, size_t S1B, size_t S1C, typename... DA, typename... DB, typename... DC>
@@ -105,4 +107,5 @@ void ParZip(const F& f, const View<A, Pair<D1, S1A>, DA...>& a, const View<B, Pa
 	for (thread& t : threads) {
 		t.join();
 	}
+	//cout << "ParZip " << a << " " << b << " = " << result << endl;
 }

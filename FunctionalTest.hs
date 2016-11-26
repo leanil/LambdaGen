@@ -32,11 +32,13 @@ funcTest5 =
             (scl 5))
         funcTest4
 
+-- {50, 122}
 funcTest6 =
     mkMap
         (app (dotProd 3) (vecView "vec" [3]))
         (vecView "mat" [2,3])
 
+-- {50, 122}
 funcTest6T =
     mkReduce
         (vecAdd 2)
@@ -51,10 +53,19 @@ b = vecView "b" [3]
 funcTest7 =
     app (app (outerProd 3 3) a) b
 
+-- {{22,28},{49,64}}
 funcTest8 =
     app (app (matMul 2 3 2) (transpose [2,1] $ vecView "mat" [2,3])) (vecView "mat" [3,2])
 
+-- {{{50,60},{114,140},{178,220}},{{242,300},{306,380},{370,460}}}
 funcTest9 =
+    let m    = var "m" (power (power double (dim 3)) (dim 4))
+        prod = lam m (mkReduce
+                        (matAdd 3 2)
+                        (mkZipWith (outerProd 3 2) m (vecView "mat8" [4,2])))
+    in  mkMap prod (transpose [1,3,2] $ vecView "tens" [2,3,4])
+
+funcTest10 =
     mkZipWith
         (lam x (lam y (add x y )))
         (mkMap

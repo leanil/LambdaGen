@@ -7,6 +7,7 @@ import ErrorTest
 import Expr
 import FunctionalTest
 import Parallel
+import PerformanceTest
 import Recursion
 import Storage
 import Type
@@ -15,7 +16,7 @@ import Control.Comonad (extract)
 import Data.Functor.Foldable (cata, para)
 import System.IO (print)
 
-test = funcTest6
+test = funcTest9
 
 tc = cata (annotate typecheckAlg) test
 
@@ -26,6 +27,6 @@ main =
                 para (annotatePara codeGenAlg) $
                 cata (annotate collectStgAlg) $
                 assignStorage $
-                parallelize 3 tc
-                        
-    (Right errors) -> print errors
+                parallelize 8 tc
+
+    (Right errors) -> print tc
