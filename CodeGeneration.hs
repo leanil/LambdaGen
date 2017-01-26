@@ -14,7 +14,6 @@ import Data.Functor.Foldable (Fix(..))
 import Data.List (intercalate)
 import Data.Vinyl
 
-type Threshold = Int
 type CodeGenT = String
 codeGenAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) =>
     RAlgebra (Cofree ExprF (R fields)) CodeGenT

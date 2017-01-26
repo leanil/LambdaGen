@@ -29,4 +29,4 @@ main =
                 assignStorage $
                 parallelize 8 tc
 
-    (Right errors) -> print tc
+    (Right errors) -> print errors

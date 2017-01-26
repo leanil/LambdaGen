@@ -47,8 +47,19 @@ matAdd a b = let m1 = var "m1" (power (power double (dim b)) (dim a))
              in  lam m1 (lam m2 (mkZipWith (vecAdd b) m1 m2))
 
 matMul :: Int -> Int -> Int -> Expr
-matMul a b c = let m1 = var "m1" (power (power double (dim a)) (dim b))
-                   m2 = var "m2" (power (power double (dim c)) (dim b))
+matMul a b c = let v  = var "v" (power double (dim b))
+                   m1 = var "m1" (power (power double (dim b)) (dim a))
+                   m2 = var "m2" (power (power double (dim b)) (dim c))
                in lam m1 (lam m2
+                      (mkMap
+                          (lam v (mkMap
+                                     (app (dotProd b) v)
+                                     m2))
+                          m1))
+
+matMul2 :: Int -> Int -> Int -> Expr
+matMul2 a b c = let m1 = var "m1" (power (power double (dim a)) (dim b))
+                    m2 = var "m2" (power (power double (dim c)) (dim b))
+                in lam m1 (lam m2
                       (mkReduce (matAdd a c)
                           (mkZipWith (outerProd a c) m1 m2)))

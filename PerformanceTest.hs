@@ -15,4 +15,4 @@ vecSum =
     let a = 10^8 in
     mkReduce
         sclAdd
-        (vecView "vec" [a])
+        (vecView "a" [a])

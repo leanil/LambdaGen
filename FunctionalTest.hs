@@ -55,7 +55,7 @@ funcTest7 =
 
 -- {{22,28},{49,64}}
 funcTest8 =
-    app (app (matMul 2 3 2) (transpose [2,1] $ vecView "mat" [2,3])) (vecView "mat" [3,2])
+    app (app (matMul 2 3 2) (vecView "mat" [2,3])) (transpose [2,1] $ vecView "mat" [3,2])
 
 -- {{{50,60},{114,140},{178,220}},{{242,300},{306,380},{370,460}}}
 funcTest9 =
