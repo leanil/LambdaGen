@@ -40,7 +40,7 @@ codeGenAlg (r ::< Apply (_,a) (rb :< _,b)) = decorate r $ withNL b ++ a ++ "(" +
 codeGenAlg (r ::< Lambda id _ (_,a)) =
     "[&](const auto& " ++ id ++ "){return\n" ++ getBody a r ++ ";}" where
      getBody s (getType -> (Fix (Arrow _ (Fix Arrow{})))) = s
-     getBody s r = "[&](auto& result" ++ threadId r ++ "){\n" ++ s ++ ";}"
+     getBody s r = "[&](const auto& result" ++ threadId r ++ "){\n" ++ s ++ ";}"
      threadId (snd . getParData -> Just _)  = ", unsigned thread_id"
      threadId (snd . getParData -> Nothing) = ""
 

@@ -17,7 +17,7 @@ pair<double, double> measure_time(map<string, double*>& bigVectors) {
 		auto start = chrono::high_resolution_clock::now();
 		//min_calc_time = min(min_calc_time, evaluator(bigVectors));
 		auto done = chrono::high_resolution_clock::now();
-		min_total_time = min(min_total_time, chrono::duration_cast<chrono::milliseconds>(done - start).count() / 1000.0);
+		min_total_time = min(min_total_time, chrono::duration_cast<chrono::microseconds>(done - start).count() / 1000000.0);
 	}
 	return{ min_total_time, min_calc_time };
 }
@@ -59,5 +59,6 @@ void run_performance_test() {
 }
 
 int main() {
+	//run_performance_test();
 	run_functional_test();
 }

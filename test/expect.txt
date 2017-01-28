@@ -1,0 +1,9 @@
+result1.hpp 20
+result2.hpp 17
+result3.hpp 16
+result4.hpp {50,122}
+result5.hpp {50,122}
+result6.hpp {{1,2,3},{2,4,6},{3,6,9}}
+result7.hpp {{22,28},{49,64}}
+result8.hpp {{{50,60},{114,140},{178,220}},{{242,300},{306,380},{370,460}}}
+result9.hpp {4,8,12}

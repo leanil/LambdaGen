@@ -7,39 +7,39 @@ import Type
 x = var "x" double
 y = var "y" double
 
-funcTest1 = mul (add (scl 2) (scl 3)) (scl 4)
+test1 = mul (add (scl 2) (scl 3)) (scl 4)
 
-funcTest2 = 
+test2 = 
     app
         (app
             (lam x (lam y (add x y )))
             (scl 5))
         (mul (scl 4) (scl 3))
 
-funcTest3 =
+test3 =
     app
         (lam y (mul y y))
         (app
             (lam x (add x x))
             (scl 2))
 
-funcTest4 = vec [funcTest1, funcTest2, funcTest3]
+test4 = vec [test1, test2, test3]
 
-funcTest5 =
+test5 =
     mkMap
         (app
             (lam x (lam y (add x y)))
             (scl 5))
-        funcTest4
+        test4
 
 -- {50, 122}
-funcTest6 =
+test6 =
     mkMap
         (app (dotProd 3) (vecView "vec" [3]))
         (vecView "mat" [2,3])
 
 -- {50, 122}
-funcTest6T =
+test7 =
     mkReduce
         (vecAdd 2)
         (mkZipWith
@@ -50,22 +50,23 @@ funcTest6T =
 a = vecView "a" [3]
 b = vecView "b" [3]
 
-funcTest7 =
+test8 =
     app (app (outerProd 3 3) a) b
 
 -- {{22,28},{49,64}}
-funcTest8 =
+test9 =
     app (app (matMul 2 3 2) (vecView "mat" [2,3])) (transpose [2,1] $ vecView "mat" [3,2])
 
 -- {{{50,60},{114,140},{178,220}},{{242,300},{306,380},{370,460}}}
-funcTest9 =
+test10 =
     let m    = var "m" (power (power double (dim 3)) (dim 4))
         prod = lam m (mkReduce
                         (matAdd 3 2)
                         (mkZipWith (outerProd 3 2) m (vecView "mat8" [4,2])))
     in  mkMap prod (transpose [1,3,2] $ vecView "tens" [2,3,4])
 
-funcTest10 =
+-- {4,8,12}
+test11 =
     mkZipWith
         (lam x (lam y (add x y )))
         (mkMap
@@ -73,6 +74,7 @@ funcTest10 =
             a)
         b
                 
+funcTests = [test1, test2, test3, test6, test7, test8, test9, test10, test11]
 
     
 

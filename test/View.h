@@ -36,7 +36,7 @@ public:
 		loc = x.loc;
 	}
 
-	void copy(const View<T, D1, Dims...>& x) {
+	void copy(const View<T, D1, Dims...>& x) const {
 		for (size_t i = 0; i < D1::dim; ++i) {
 			(*this)[i].copy(x[i]);
 		}
@@ -65,18 +65,18 @@ public:
 
 	View(T* loc) : loc{ loc } {}
 
-	View(double d) : View(new double{ d }) {}
+	//View(double d) : View(new double{ d }) {}
 
-	View<T>& operator=(const View<T>& x) {
+	View<T>& operator=(const View<T>& x) const {
 		*loc = *x.loc;
 		return *this;
 	}
 
-	void copy(double d) {
-		*loc = d;
+	void copy(T t) const {
+		*loc = t;
 	}
 
-	T& operator=(const T& x) { return *loc = x; }
+	T& operator=(const T& x) const { return *loc = x; }
 
 	operator T() const { return *loc; }
 private:

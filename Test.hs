@@ -13,16 +13,14 @@ import Storage
 import Type
 import Typecheck
 import Control.Comonad (extract)
+import Control.Monad (foldM)
 import Data.Functor.Foldable (cata, para)
 import System.IO (print)
 
-test = test6
-
-tc = cata (annotate typecheckAlg) test
-
-main =
+process test result =
+    let tc = cata (annotate typecheckAlg) test in
     case fieldVal ([] :: [TypecheckT]) $ extract tc of
-    (Left _) -> writeFile "test/result.hpp" $
+    (Left _) -> writeFile result $
                 createEvaluator $ getCode $ extract $
                 para (annotatePara codeGenAlg) $
                 cata (annotate collectStgAlg) $
@@ -30,3 +28,6 @@ main =
                 parallelize 8 tc
 
     (Right errors) -> print errors
+
+main =
+    foldM (\_ (t,i) -> process t ("result" ++ show i ++ ".hpp")) () (zip funcTests [1..])
