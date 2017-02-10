@@ -16,8 +16,8 @@ import Data.Functor.Foldable (ana)
 import System.Random
 
 type AssignStgT = (StdGen, Bool)
-data ResultId = Inherit | Implicit String | Prealloc Int
-data Result = Std ResultId | Red (ResultId, ResultId)
+data ResultId = Inherit | Implicit String | Prealloc Int deriving Show
+data Result = Std ResultId | Red (ResultId, ResultId) deriving Show
 
 getPrimary :: Result -> ResultId
 getPrimary (Std x) = x
@@ -80,7 +80,7 @@ sizes [] [] = ""
 sizes d s = "," ++ intercalate "," (zipWith (\x y -> "Pair<" ++ show x ++ "," ++ show y ++ ">") d s)
 
 type ResultPack = [ResultStg]
-data ResultStg = ResultStg { id :: Int, tnum :: Int, dim :: [Int], stride :: [Int] }
+data ResultStg = ResultStg { id :: Int, tnum :: Int, dim :: [Int], stride :: [Int] } deriving Show
 
 collectStgAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
 

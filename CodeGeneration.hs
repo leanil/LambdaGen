@@ -14,49 +14,50 @@ import Data.Functor.Foldable (Fix(..))
 import Data.List (intercalate)
 import Data.Vinyl
 
-type CodeGenT = String
+newtype CodeGenT = CodeGenT { getStr :: String }
 codeGenAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) =>
     RAlgebra (Cofree ExprF (R fields)) CodeGenT
 
-codeGenAlg (r ::< Scalar s) = ""
+codeGenAlg (r ::< Scalar s) = CodeGenT ""
 
-codeGenAlg (r ::< VectorView id d s) = "" --getName r ++ "=bigVectors.at(\"" ++ id ++ "\")"
+codeGenAlg (r ::< VectorView id d s) = CodeGenT "" --getName r ++ "=bigVectors.at(\"" ++ id ++ "\")"
 
 -- codeGenAlg (r ::< Vector e) = let (strs, bools) = unzip $ snd $ unzip e in
 --     ("make_vector({" ++ intercalate "," strs ++ "})", or bools)
 
-codeGenAlg (r ::< Addition (ra :< _, a) (rb :< _, b)) =
-    withNL a ++ withNL b ++
+codeGenAlg (r ::< Addition (ra :< _,getStr -> a) (rb :< _,getStr -> b)) =
+    CodeGenT $ withNL a ++ withNL b ++
     getName r ++ "=" ++ getName ra ++ "+" ++ getName rb
 
-codeGenAlg (r ::< Multiplication (ra :< _, a) (rb :< _,b)) =
-    withNL a ++ withNL b ++
+codeGenAlg (r ::< Multiplication (ra :< _,getStr -> a) (rb :< _,getStr -> b)) =
+    CodeGenT $ withNL a ++ withNL b ++
     getName r ++ "=" ++ getName ra ++ "*" ++ getName rb
 
-codeGenAlg (r ::< Apply (_,a) (rb :< _,b)) = decorate r $ withNL b ++ a ++ "(" ++ getName rb ++ ")" where
-    decorate (getType -> Fix Arrow{}) s = '(' : s ++ ")"
-    decorate _                        s = s ++ "(" ++ getName r ++ ")"
+codeGenAlg (r ::< Apply (_,getStr -> a) (rb :< _,getStr -> b)) =
+    CodeGenT $ decorate r $ withNL b ++ a ++ "(" ++ getName rb ++ ")" where
+        decorate (getType -> Fix Arrow{}) s = '(' : s ++ ")"
+        decorate _                        s = s ++ "(" ++ getName r ++ ")"
 
-codeGenAlg (r ::< Lambda id _ (_,a)) =
-    "[&](const auto& " ++ id ++ "){return\n" ++ getBody a r ++ ";}" where
+codeGenAlg (r ::< Lambda id _ (_,getStr -> a)) =
+     CodeGenT $ "[&](const auto& " ++ id ++ "){return\n" ++ getBody a r ++ ";}" where
      getBody s (getType -> (Fix (Arrow _ (Fix Arrow{})))) = s
      getBody s r = "[&](const auto& result" ++ threadId r ++ "){\n" ++ s ++ ";}"
      threadId (snd . getParData -> Just _)  = ", unsigned thread_id"
      threadId (snd . getParData -> Nothing) = ""
 
-codeGenAlg (r ::< Variable id _) = ""
+codeGenAlg (r ::< Variable id _) = CodeGenT ""
 
-codeGenAlg (r ::< Map (_,a) (rb :< _,b)) =
-    withNL b ++ mkPar r "Map" (a ++ "," ++ getName rb ++ "," ++ getName r)
+codeGenAlg (r ::< Map (_,getStr -> a) (rb :< _,getStr -> b)) =
+    CodeGenT $ withNL b ++ mkPar r "Map" (a ++ "," ++ getName rb ++ "," ++ getName r)
         
 
-codeGenAlg (r ::< Reduce (_,a) (rb :< _,b)) =
-    withNL b ++ mkPar r "Reduce" (a ++ "," ++ getName rb ++ "," ++ getName r ++ mkTemp r) where
+codeGenAlg (r ::< Reduce (_,getStr -> a) (rb :< _,getStr -> b)) =
+    CodeGenT $ withNL b ++ mkPar r "Reduce" (a ++ "," ++ getName rb ++ "," ++ getName r ++ mkTemp r) where
         mkTemp (fieldVal ([] :: [Result]) -> Red (_,Prealloc x)) = ",s" ++ show x
         mkTemp _                                          = ""
 
-codeGenAlg (r ::< ZipWith (_,a) (rb :< _,b) (rc :< _,c)) =
-    withNL b ++ withNL c ++ mkPar r "Zip" (a ++ "," ++ intercalate "," (map getName [rb, rc, r]))
+codeGenAlg (r ::< ZipWith (_,getStr -> a) (rb :< _,getStr -> b) (rc :< _,getStr -> c)) =
+    CodeGenT $ withNL b ++ withNL c ++ mkPar r "Zip" (a ++ "," ++ intercalate "," (map getName [rb, rc, r]))
 
 mkPar :: ParData ∈ fields => R fields -> String -> String -> String
 mkPar (snd . getParData -> Just t) hof body  = "Par" ++ hof ++ "(" ++ body ++ "," ++ show t ++ ")"
@@ -75,7 +76,7 @@ getName (getPrimary . fieldVal ([] :: [Result]) &&& fst . getParData -> (Preallo
 getCode :: (CodeGenT ∈ fields, Result ∈ fields, ResultPack ∈ fields, ParData ∈ fields) => R fields -> String
 getCode r =
     preAlloc (fieldVal ([] :: [ResultPack]) r) ++
-    fieldVal ([] :: [CodeGenT]) r ++ ";\n" ++
+    getStr (fieldVal ([] :: [CodeGenT]) r) ++ ";\n" ++
     "return " ++ getName r ++ ";\n"
 
 preAlloc :: ResultPack -> String
