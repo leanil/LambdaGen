@@ -6,7 +6,7 @@
 
 auto evaluator(std::map<std::string, double*> bigVectors){
 	View<double,Pair<2,1>> s2147482884;
-	View<double,Pair<3,1>> s332304331[8];
+	View<double,Pair<8,3>,Pair<3,1>> s332304331;
 	ParMap(([&](const auto& v1){return
 	[&](const auto& v2){return
 	[&](const auto& result, unsigned thread_id){

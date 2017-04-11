@@ -73,7 +73,10 @@ test11 =
             (lam x (mul (scl 3) x))
             a)
         b
-                
+
+test12 =
+    mkMap (lam x (add x (scl 1))) a
+
 funcTests = [test1, test2, test3, test6, test7, test8, test9, test10, test11]
 
     

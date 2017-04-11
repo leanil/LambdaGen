@@ -6,7 +6,7 @@
 
 auto evaluator(std::map<std::string, double*> bigVectors){
 	View<double,Pair<2,1>> s2147482884;
-	View<double,Pair<2,1>> s2092764894[8];
+	View<double,Pair<8,2>,Pair<2,1>> s2092764894;
 	View<double,Pair<3,2>,Pair<2,1>> s483997720;
 	ParZip([&](const auto& x){return
 	[&](const auto& v){return

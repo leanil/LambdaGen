@@ -10,6 +10,7 @@ import TypePrinter
 import Control.Arrow
 import Control.Comonad.Cofree (Cofree(..))
 import Data.List (intercalate, unfoldr)
+import Data.Monoid
 import Data.Vinyl
 import Data.Vinyl.Functor (Identity(..))
 import Data.Functor.Foldable (ana)
@@ -27,8 +28,8 @@ assignStgAlg :: ParData ∈ fields => CoAlgebra (Cofree ExprF (R (Result ': fiel
 
 assignStgAlg (r :< Scalar x, s) = (Identity (fst $ assignHelper s (Just $ show x)) :& r) ::< Scalar x
 
-assignStgAlg (r :< VectorView id a b, s) = (Identity (fst $ assignHelper s (Just $ mkView id a b)) :& r) ::< VectorView id a b where
-    mkView id d s = "View<double" ++ sizes d s ++ ">(bigVectors.at(\"" ++ id ++ "\"))"
+assignStgAlg (r :< VectorView id a b, s) = (Identity (fst $ assignHelper s (Just $ mkView id (a, b))) :& r) ::< VectorView id a b where
+    mkView id mem   = "v_" ++ id
 
 assignStgAlg (r :< Vector elements, s) = (Identity s' :& r) ::< (Vector $ zip elements (map (,True) $ unfoldr (Just .split) g'))where
     (s', g') = assignHelper s Nothing
@@ -75,44 +76,54 @@ assignHelper (g, True) id =
 assignStorage :: ParData ∈ fields => Cofree ExprF (R fields) -> Cofree ExprF (R (Result ': fields))
 assignStorage e = ana assignStgAlg (e,(mkStdGen 0, True))
 
-sizes :: [Int] -> [Int] -> String
-sizes [] [] = ""
-sizes d s = "," ++ intercalate "," (zipWith (\x y -> "Pair<" ++ show x ++ "," ++ show y ++ ">") d s)
+dims :: [Int] -> Int -> String
+dims d 1 = intercalate "," $ map show d
+dims d tn = show tn ++ "," ++ dims d 1
 
-type ResultPack = [ResultStg]
-data ResultStg = ResultStg { id :: Int, tnum :: Int, dim :: [Int], stride :: [Int] } deriving Show
+strides :: MemStruct -> Int -> String
+strides (_,s) 1 = "std::array<size_t," ++ show (length s) ++ ">{" ++ intercalate "," (map show s) ++ "}"
+strides (d,s) tn = strides (d,product d : s) 1
+
+viewType :: MemStruct -> Int -> String -> (String,String)
+viewType mem@(d,_) tn ptrType = ("View<" ++ ptrType ++ ",double" ++ (if length d > 0 then "," else "") ++ dims d tn ++ ">", strides mem tn)
+
+newtype ResultPack = ResultPack ([ResultStg], [BigVector]) -- collect vecView dimensions to allocate buffers for user data
+data ResultStg = ResultStg { id :: Int, tnum :: Int, mem :: MemStruct } deriving Show
+type BigVector = (String, MemStruct)
+type MemStruct = ([Int], [Int])
+
+instance Monoid ResultPack where
+    mappend (ResultPack (a, b)) (ResultPack (c, d)) = ResultPack (a++c, b++d)
+    mempty = ResultPack ([], [])
 
 collectStgAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
 
 collectStgAlg (r ::< Scalar{}) = getStgAndDims r
 
-collectStgAlg (r ::< VectorView _ d s) = getStgAndDims r
-    -- case (getPrimary . fieldVal ([] :: [Result]) &&& fst . getParData) r of
-    -- (Nothing,_) -> []
-    -- (Just x, t) -> [ResultStg x t d s]
+collectStgAlg (r ::< VectorView id d s) = ResultPack([], [(id, (d,s))])
 
-collectStgAlg (r ::< Vector elements) = getStgAndDims r ++ concat elements
+collectStgAlg (r ::< Vector elements) = getStgAndDims r <> mconcat elements
 
-collectStgAlg (r ::< Addition a b) = getStgAndDims r ++ a ++ b
+collectStgAlg (r ::< Addition a b) = getStgAndDims r <> a <> b
 
-collectStgAlg (r ::< Multiplication a b) = getStgAndDims r ++  a ++ b
+collectStgAlg (r ::< Multiplication a b) = getStgAndDims r <>  a <> b
 
-collectStgAlg (r ::< Apply a b) = getStgAndDims r ++ a ++ b
+collectStgAlg (r ::< Apply a b) = getStgAndDims r <> a <> b
 
-collectStgAlg (r ::< Lambda _ _ a) = getStgAndDims r ++ a
+collectStgAlg (r ::< Lambda _ _ a) = getStgAndDims r <> a
 
 collectStgAlg (r ::< Variable{}) = getStgAndDims r
 
-collectStgAlg (r ::< Map a b) = getStgAndDims r ++ a ++ b
+collectStgAlg (r ::< Map a b) = getStgAndDims r <> a <> b
     
-collectStgAlg (r ::< Reduce a b) = getStgAndDims r ++ a ++ b
+collectStgAlg (r ::< Reduce a b) = getStgAndDims r <> a <> b
 
-collectStgAlg (r ::< ZipWith a b c) = getStgAndDims r ++ a ++ b ++ c
+collectStgAlg (r ::< ZipWith a b c) = getStgAndDims r <> a <> b <> c
 
 getStgAndDims :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => R (fields) -> ResultPack
-getStgAndDims r = std r ++ temp r where
-    std (getPrimary . fieldVal ([] :: [Result]) &&& fst . getParData -> (Prealloc x, t)) = [ResultStg x t ds $ defaultStrides ds]
+getStgAndDims r = ResultPack (std r ++ temp r, []) where
+    std (getPrimary . fieldVal ([] :: [Result]) &&& fst . getParData -> (Prealloc x, t)) = [ResultStg x t (ds, defaultStrides ds)]
     std (getPrimary . fieldVal ([] :: [Result]) -> _) = []
-    temp (fieldVal ([] :: [Result]) &&& snd . getParData -> (Red (_,Prealloc x), Just t)) = [ResultStg x t ds $ defaultStrides ds]
+    temp (fieldVal ([] :: [Result]) &&& snd . getParData -> (Red (_,Prealloc x), Just t)) = [ResultStg x t (ds, defaultStrides ds)]
     temp _ = []
     ds = countDims $ getType r

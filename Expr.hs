@@ -14,7 +14,7 @@ data ExprF a
     | Subtraction { left :: a, right :: a }
     | Multiplication { left :: a, right :: a }
     | Division { left :: a, right :: a }
-    | VectorView { id :: String, dimensions :: [Int], strides :: [Int] }
+    | VectorView { id :: String, dms :: [Int], strd :: [Int] }
     | Vector { elements :: [a] }
     | Apply { lambda :: a, input :: a}
     | Lambda { varID :: String, varType :: Type, body :: a }

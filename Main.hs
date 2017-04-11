@@ -19,7 +19,7 @@ import Data.List (intercalate)
 import Data.Proxy (Proxy(Proxy))
 import System.IO (print)
 
-test = typeErrors
+test = test10
 
 process expr =
     para (annotatePara codeGenAlg) $
@@ -32,7 +32,7 @@ main = do
     case fieldVal ([] :: [TypecheckT]) $ extract tcd of
         (Left _) -> do
             let prd = process tcd
-            writeFile "test/result.hpp" $ createEvaluator $ getCode $ extract prd
+            writeFile "test/result.hpp" $ createEvaluator $ extract prd
             putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT,ParData,Result])) prd
         (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
