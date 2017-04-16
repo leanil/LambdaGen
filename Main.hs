@@ -19,7 +19,7 @@ import Data.List (intercalate)
 import Data.Proxy (Proxy(Proxy))
 import System.IO (print)
 
-test = test10
+test = test13
 
 process expr =
     para (annotatePara codeGenAlg) $

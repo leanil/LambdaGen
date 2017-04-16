@@ -77,6 +77,13 @@ test11 =
 test12 =
     mkMap (lam x (add x (scl 1))) a
 
+test13 =
+    mkMap
+        (app
+            sclMul
+            (mkReduce sclAdd a))
+        (mkZipWith sclAdd a b)
+
 funcTests = [test1, test2, test3, test6, test7, test8, test9, test10, test11]
 
     
