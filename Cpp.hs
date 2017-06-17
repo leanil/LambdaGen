@@ -15,7 +15,7 @@ createEvaluator expr =
     "\n" ++ signature ++ "{\n" ++
     "\t" ++ fst returnType ++ " result(" ++ snd returnType ++ ", new double[" ++ sMemSize (getMemStruct resPack) ++ "]);\n" ++
     indent "\t" (makeBuffers resPack) ++
-    "\tcl::sycl::queue deviceQueue((cl::sycl::gpu_selector()));\n" ++
+    "\tcl::sycl::queue deviceQueue;\n" ++ -- ((cl::sycl::gpu_selector()))
     indent "\t" (getCode expr) ++
     "\treturn result;\n}\n"
     where
@@ -31,7 +31,7 @@ getReturnType (ResultPack (ResultStg _ tn mem : _,_)) = viewType mem tn "double*
 makeBuffers :: ResultPack -> String
 makeBuffers (ResultPack (ResultStg id _ mem : stg,bigVec)) =
     concatMap
-        (\(id, mem) -> "buffer_t b_" ++ id ++ "(const_cast<const double*>(bigVectors.at(\"" ++ id ++ "\"))," ++ sMemSize mem ++ ");\n")
+        (\(BigVector id dataId mem) -> "buffer_t b_" ++ id ++ "(const_cast<const double*>(bigVectors.at(\"" ++ dataId ++ "\"))," ++ sMemSize mem ++ ");\n")
         bigVec ++
     "buffer_t b_" ++ show id ++ "(result.data, " ++ sMemSize mem ++ ");\n" ++
     concatMap

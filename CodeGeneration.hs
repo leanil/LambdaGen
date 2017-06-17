@@ -27,23 +27,27 @@ codeGenAlg (r ::< VectorView id d s) = CodeGenT [""]
 --     ("make_vector({" ++ intercalate "," strs ++ "})", or bools)
 
 codeGenAlg (r ::< Addition (ra :< _,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs))) =
-    CodeGenT $ (withNL a ++ withNL b ++ getName r ++ "=" ++ getName ra ++ "+" ++ getName rb) : bs ++ as
+    mkRoot r (withNL a ++ withNL b ++ getName r ++ "=" ++ getName ra ++ "+" ++ getName rb) (bs ++ as)
 
 codeGenAlg (r ::< Multiplication (ra :< _,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs))) =
-    CodeGenT $ (withNL a ++ withNL b ++ getName r ++ "=" ++ getName ra ++ "*" ++ getName rb) : bs ++ as
+    mkRoot r (withNL a ++ withNL b ++ getName r ++ "=" ++ getName ra ++ "*" ++ getName rb) (bs ++ as)
 
 codeGenAlg (r ::< Apply (_,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs))) =
-    CodeGenT $ (decorate r $ withNL b ++ a ++ "(" ++ getName rb ++ ")") : bs ++ as where
-        decorate (getType -> Fix Arrow{}) s = s -- TODO: should it be parenthesized? '(' : s ++ ")"
+    mkRoot r (decorate r $ withNL b ++ a ++ "(" ++ getName rb ++ ")") (bs ++ as) where
+        decorate (getType -> Fix Arrow{}) s = s
         decorate _                        s = s ++ "(" ++ getName r ++ ")"
 
 codeGenAlg (r@(getType -> (Fix (Arrow b _))) ::< Lambda id _ (_,CodeGenT (a:as))) =
-     CodeGenT $ ("[=](" ++ mkView b ++ " " ++ id ++ "){return\n" ++ getBody a r ++ ";}") : as where
+     CodeGenT $ ("[=](" ++ mkParam b ++ " " ++ id ++ "){return\n" ++ getBody a r ++ ";}") : as where
      getBody s (getType -> (Fix (Arrow _ (Fix Arrow{})))) = s
      getBody s (getType -> (Fix (Arrow _ c))) = "[=](" ++ mkView c ++ " result" ++ threadId r ++ "){\n" ++ s ++ ";}"
         where ds = countDims c
-     threadId (snd . getParData -> Just _)  = ", unsigned thread_id"
+     threadId (snd . getParData -> Just x)
+        | x == 1 = ""
+        | x > 1  = ", unsigned thread_id"
      threadId (snd . getParData -> Nothing) = ""
+     mkParam (countDims -> []) = "double"
+     mkParam r = mkView r
      mkView (countDims -> ds) = fst $ viewType (ds,[]) 1 "accessor"
 
 codeGenAlg (r ::< Variable id _) = CodeGenT [""]
@@ -67,13 +71,19 @@ mkPar r@(snd . getParData -> Just t) vec hof body groups =
 mkPar (snd . getParData -> Nothing) vec hof body groups =
     CodeGenT $ (vec ++ hof ++ "(" ++ body ++ ")") : groups
 
+mkRoot :: (ParData ∈ fields, ResultPack ∈ fields) => R fields -> String -> [String] -> CodeGenT
+mkRoot r@(snd . getParData -> Just 1) code groups =
+    CodeGenT $ "" : mkCommandGroup r (wrap code) : groups where
+        wrap code = "act_cgh->single_task<class SingleKernel>([=] () mutable {\n" ++ (indent "\t" (code ++ ";")) ++ "});"
+mkRoot (snd . getParData -> Nothing) code groups = CodeGenT $ code : groups
+
 mkCommandGroup :: ResultPack ∈ fields => R fields -> String -> String
 mkCommandGroup (fieldVal ([] :: [ResultPack]) -> ResultPack (stg,bigVec)) s =
     "deviceQueue.submit([&] (cl::sycl::handler &cgh) {\n" ++
     "\tact_cgh = &cgh;\n" ++
     concatMap
-        (\(id, mem) -> let (view, strides) = viewType mem 1 "accessor" in
-            "\t" ++ view ++ " v_" ++ id ++ "(" ++ strides ++ ",b_" ++ id ++ ".get_access<rw_access>(cgh));\n")
+        (\(BigVector id _ mem) -> let (view, strides) = viewType mem 1 "accessor" in
+            "\t" ++ view ++ id ++ "(" ++ strides ++ ",b_" ++ id ++ ".get_access<rw_access>(cgh));\n")
         bigVec ++
     concatMap
         (\(ResultStg id tn mem) -> let (view, strides) = viewType mem tn "accessor" in

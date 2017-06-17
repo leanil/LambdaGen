@@ -1,103 +1,71 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <iostream>
-#include <numeric>
-#include <utility>
-#include <vector>
+#include <iterator>
 
-using namespace std;
+template<typename Ptr, typename T, size_t... Dims> struct View {};
 
-template<size_t D, size_t S>
-struct Pair {
-	static constexpr size_t dim = D;
-	static constexpr size_t stride = S;
+template<typename Ptr, typename T, size_t D1, size_t... Dims>
+struct View<Ptr, T, D1, Dims...> {
+
+    using stride_t = std::array<size_t, sizeof...(Dims)+1>;
+
+    View(stride_t stride, const Ptr& data, size_t base = 0) : stride(stride), data(data), base(base) {}
+
+    struct View<Ptr, T, D1, Dims...>& operator=(const View<Ptr, T, D1, Dims...>& other) {
+         for (size_t i = 0; i < D1; ++i) {
+             (*this)[i] = other[i];
+         }
+         return *this;
+    }
+
+    View<Ptr, T, Dims...> operator[](size_t idx) const {
+        std::array<size_t, sizeof...(Dims)> new_stride;
+        std::copy(std::next(stride.begin()), stride.end(), new_stride.begin());
+        return View<Ptr, T, Dims...>(new_stride, data, base + idx*stride[0]);
+    }
+
+    stride_t stride;
+    Ptr data;
+    size_t base;
 };
 
-template<typename D1, typename... Dims>
-struct Size {
-	static constexpr size_t result = D1::dim * Size<Dims...>::result;
-};
-
-template<typename D>
-struct Size<D> {
-	static constexpr size_t result = D::dim;
-};
-
-template<typename T, typename... Dims> class View {};
-
-template<typename T, typename D1, typename... Dims>
-class View<T, D1, Dims...> {
-public:
-	View() : loc{ new T[Size<D1, Dims...>::result] } {}
-
-	View(T* loc) : loc{ loc } {}
-
-	void operator=(const View<T, D1, Dims...>& x) {
-		loc = x.loc;
-	}
-
-	void copy(const View<T, D1, Dims...>& x) const {
-		for (size_t i = 0; i < D1::dim; ++i) {
-			(*this)[i].copy(x[i]);
-		}
-	}
-
-	auto operator[](size_t idx) const {
-		return View<T, Dims...>(loc + idx*D1::stride);
-	}
-private:
-	T* loc;
-};
-
-template<typename T, typename D1, typename... Dims>
-ostream& operator<<(ostream& out, const View<T, D1, Dims...>& v) {
-	out << "{";
-	for (size_t i = 0; i < D1::dim; ++i) {
-		out << (i ? "," : "") << v[i];
-	}
-	return out << "}";
+template<typename Ptr, typename T, size_t D1, size_t... Dims>
+std::ostream& operator<<(std::ostream& out, const View<Ptr, T, D1, Dims...>& v) {
+    out << "{";
+    for (size_t i = 0; i < D1; ++i) {
+        out << (i ? "," : "") << v[i];
+    }
+    return out << "}";
 }
 
-template<typename T>
-class View<T> {
-public:
-	View() : loc{ new T } {}
 
-	View(T* loc) : loc{ loc } {}
+template<typename Ptr, typename T>
+struct View<Ptr, T> {
 
-	//View(double d) : View(new double{ d }) {}
+    View(std::array<size_t, 0>, Ptr data, size_t base = 0) : data(data), base(base) {}
 
-	View<T>& operator=(const View<T>& x) const {
-		*loc = *x.loc;
-		return *this;
-	}
+    // Accessor index type should be cl::sycl::id (according to 3.4.6.3 of the spec), but it works only with integer;
+    View<Ptr, T>& operator=(const View<Ptr, T>& other) {
+        data[base] = other.data[other.base];
+        return *this;
+    }
 
-	void copy(T t) const {
-		*loc = t;
-	}
+    void operator=(T x) {
+        data[base] = x;
+    }
 
-	T& operator=(const T& x) const { return *loc = x; }
+    operator T() const {
+        return data[base];
+    }
 
-	operator T() const { return *loc; }
-private:
-	T* loc;
+    Ptr data;
+    size_t base;
 };
 
-template<typename T>
-ostream& operator<<(ostream& out, const View<T>& v) {
-	return out << (T)v;
+template<typename Ptr, typename T>
+std::ostream& operator<<(std::ostream& out, const View<Ptr, T>& v) {
+    return out << (T)v;
 }
-
-//template<typename T, typename D, typename... Dims>
-//using View<View<T, Dims...>, D> = View<T, D, Dims...>;
-
-template<typename T, size_t D1>
-struct ViewComposer {
-	using type = View<T, Pair<D1, 1>>;
-};
-
-template<typename T, size_t D1, typename... Dims>
-struct ViewComposer<View<T, Dims...>, D1> {
-	using type = View<T, Pair<D1, Size<Dims...>::result>, Dims...>;
-};
-

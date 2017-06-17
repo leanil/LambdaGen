@@ -27,8 +27,9 @@ parallelizerAlg _ (r :< Addition a b, p) = (Identity (parData p) :& r) ::< Addit
 
 parallelizerAlg _ (r :< Multiplication a b, p) = (Identity (parData p) :& r) ::< Multiplication (a,p) (b,p)
 
+parallelizerAlg _ (r :< Apply a b, None) = (Identity (1, Just 1) :& r) ::< Apply (a,Started 1) (b,None)
 parallelizerAlg _ (r :< Apply a b, Started i) = (Identity (1, Nothing) :& r) ::< Apply (a,Started i) (b,None)
-parallelizerAlg _ (r :< Apply a b, p) = (Identity (parData p) :& r) ::< Apply (a,p) (b,p)
+parallelizerAlg _ (r :< Apply a b, p@Full{}) = (Identity (parData p) :& r) ::< Apply (a,p) (b,p)
 
 parallelizerAlg _ (r :< Lambda a b c, Started i) = (Identity (i, Just i) :& r) ::<
     case getType r of
@@ -52,7 +53,9 @@ parData None = (1, Nothing)
 parData (Full i) = (i, Nothing)
 
 parallelize :: TypecheckT ∈ fields => Int -> Cofree ExprF (R fields) -> Cofree ExprF (R (ParData ': fields))
-parallelize t = ana (parallelizerAlg t) . (,None)
+parallelize t = root . ana (parallelizerAlg t) . (,None) where
+    root t@((getParData -> (_, Just _)) :< _) = t
+    root (r :< t) = rput (Identity ((1, Just 1) :: ParData)) r :< t
 
 getParData :: ParData ∈ fields => R fields -> ParData
 getParData (fieldVal ([] :: [ParData]) -> p) = p

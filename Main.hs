@@ -19,13 +19,13 @@ import Data.List (intercalate)
 import Data.Proxy (Proxy(Proxy))
 import System.IO (print)
 
-test = test13
+test = test6
 
 process expr =
     para (annotatePara codeGenAlg) $
     cata (annotate collectStgAlg) $
     assignStorage $
-    parallelize 8 expr
+    parallelize 4 expr
 
 main = do
     let tcd = cata (annotate typecheckAlg) test
@@ -33,7 +33,7 @@ main = do
         (Left _) -> do
             let prd = process tcd
             writeFile "test/result.hpp" $ createEvaluator $ extract prd
-            putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT,ParData,Result])) prd
+            putStr $ printExpr (Proxy :: Proxy (R '[{-TypecheckT,ParData,-}ResultPack])) prd
         (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
             printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd

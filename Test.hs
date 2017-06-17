@@ -21,7 +21,7 @@ process test result =
     let tc = cata (annotate typecheckAlg) test in
     case fieldVal ([] :: [TypecheckT]) $ extract tc of
     (Left _) -> writeFile result $
-                createEvaluator $ getCode $ extract $
+                createEvaluator $ extract $
                 para (annotatePara codeGenAlg) $
                 cata (annotate collectStgAlg) $
                 assignStorage $

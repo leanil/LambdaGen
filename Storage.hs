@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, TupleSections, TypeOperators, ViewPatterns #-}
+{-# LANGUAGE DataKinds, DuplicateRecordFields, FlexibleContexts, TupleSections, TypeOperators, ViewPatterns #-}
 
 module Storage where
 
@@ -28,8 +28,8 @@ assignStgAlg :: ParData ∈ fields => CoAlgebra (Cofree ExprF (R (Result ': fiel
 
 assignStgAlg (r :< Scalar x, s) = (Identity (fst $ assignHelper s (Just $ show x)) :& r) ::< Scalar x
 
-assignStgAlg (r :< VectorView id a b, s) = (Identity (fst $ assignHelper s (Just $ mkView id (a, b))) :& r) ::< VectorView id a b where
-    mkView id mem   = "v_" ++ id
+assignStgAlg (r :< VectorView id a b, (g, True)) = (Identity (Std $ Implicit viewName) :& r) ::< VectorView id a b where
+    viewName = id ++ show (fst $ next g)
 
 assignStgAlg (r :< Vector elements, s) = (Identity s' :& r) ::< (Vector $ zip elements (map (,True) $ unfoldr (Just .split) g'))where
     (s', g') = assignHelper s Nothing
@@ -87,20 +87,28 @@ strides (d,s) tn = strides (d,product d : s) 1
 viewType :: MemStruct -> Int -> String -> (String,String)
 viewType mem@(d,_) tn ptrType = ("View<" ++ ptrType ++ ",double" ++ (if length d > 0 then "," else "") ++ dims d tn ++ ">", strides mem tn)
 
-newtype ResultPack = ResultPack ([ResultStg], [BigVector]) -- collect vecView dimensions to allocate buffers for user data
-data ResultStg = ResultStg { id :: Int, tnum :: Int, mem :: MemStruct } deriving Show
-type BigVector = (String, MemStruct)
+newtype ResultPack = ResultPack ([ResultStg], [BigVector]) deriving Show -- collect vecView dimensions to allocate buffers for user data
+data ResultStg = ResultStg { id :: Int, tnum :: Int, mem :: MemStruct } deriving (Eq, Show, Ord)
+data BigVector = BigVector { id :: String, dataId :: String, mem :: MemStruct } deriving (Eq, Show, Ord)
 type MemStruct = ([Int], [Int])
 
+merge :: Ord a => [a] -> [a] -> [a]
+merge [] y = y
+merge x [] = x
+merge (x:xs) (y:ys)
+    | x < y  = x : merge xs (y:ys)
+    | x > y  = y : merge (x:xs) ys
+    | x == y = x : merge xs ys
+
 instance Monoid ResultPack where
-    mappend (ResultPack (a, b)) (ResultPack (c, d)) = ResultPack (a++c, b++d)
+    mappend (ResultPack (a, b)) (ResultPack (c, d)) = ResultPack (a ++ c, b ++ d)
     mempty = ResultPack ([], [])
 
 collectStgAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
 
 collectStgAlg (r ::< Scalar{}) = getStgAndDims r
 
-collectStgAlg (r ::< VectorView id d s) = ResultPack([], [(id, (d,s))])
+collectStgAlg ((fieldVal ([] :: [Result]) -> Std (Implicit id)) ::< VectorView dataId d s) = ResultPack([], [BigVector id dataId (d,s)])
 
 collectStgAlg (r ::< Vector elements) = getStgAndDims r <> mconcat elements
 
