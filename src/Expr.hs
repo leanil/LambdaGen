@@ -16,7 +16,7 @@ data ExprF a
     | Division { left :: a, right :: a }
     | VectorView { id :: String, dms :: [Int], strd :: [Int] }
     | Vector { elements :: [a] }
-    | Apply { lambda :: a, input :: a}
+    | Apply { lambda :: a, value :: a}
     | Lambda { varID :: String, varType :: Type, body :: a }
     | Variable { id :: String, tp :: Type }
     | Map { lambda :: a, vector :: a }

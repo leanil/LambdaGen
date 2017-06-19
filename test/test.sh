@@ -1,11 +1,12 @@
-runhaskell -i.. ../Test.hs
-rm -f result.hpp out.txt
+runhaskell -i../src ../src/Test.hs
+rm -f result.hpp out.txt eval
 for test in result*.hpp; do
 	echo $test
-	rm -f eval
 	mv $test result.hpp
-	./build.sh
+	clang++ -I/mnt/hgfs/host/Programs/triSYCL/include/ -I/mnt/hgfs/host/Programs/boost_1_61_0/ -I../src \
+		-std=c++14 -pthread main.cpp -o eval
 	echo "$test `./eval`" >> out.txt
 	mv result.hpp $test
+	rm -f eval
 done
 diff -s out.txt expect.txt
