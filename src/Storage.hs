@@ -77,15 +77,15 @@ assignStorage :: ParData ∈ fields => Cofree ExprF (R fields) -> Cofree ExprF (
 assignStorage e = ana assignStgAlg (e,(mkStdGen 0, True))
 
 dims :: [Int] -> Int -> String
-dims d 1 = intercalate "," $ map show d
-dims d tn = show tn ++ "," ++ dims d 1
+dims d 1 = concatMap (("," ++) . show) d
+dims d tn = "," ++ show tn ++ dims d 1
 
 strides :: MemStruct -> Int -> String
 strides (_,s) 1 = "std::array<size_t," ++ show (length s) ++ ">{" ++ intercalate "," (map show s) ++ "}"
 strides (d,s) tn = strides (d,product d : s) 1
 
 viewType :: MemStruct -> Int -> String -> (String,String)
-viewType mem@(d,_) tn ptrType = ("View<" ++ ptrType ++ ",double" ++ (if length d > 0 then "," else "") ++ dims d tn ++ ">", strides mem tn)
+viewType mem@(d,_) tn ptrType = ("View<" ++ ptrType ++ ",double" ++ dims d tn ++ ">", strides mem tn)
 
 newtype ResultPack = ResultPack ([ResultStg], [BigVector]) deriving Show -- collect vecView dimensions to allocate buffers for user data
 data ResultStg = ResultStg { id :: Int, tnum :: Int, mem :: MemStruct } deriving (Eq, Show, Ord)

@@ -83,7 +83,7 @@ mkCommandGroup (fieldVal ([] :: [ResultPack]) -> ResultPack (stg,bigVec)) s =
     "\tact_cgh = &cgh;\n" ++
     concatMap
         (\(BigVector id _ mem) -> let (view, strides) = viewType mem 1 "accessor" in
-            "\t" ++ view ++ id ++ "(" ++ strides ++ ",b_" ++ id ++ ".get_access<rw_access>(cgh));\n")
+            "\t" ++ view ++ " " ++ id ++ "(" ++ strides ++ ",b_" ++ id ++ ".get_access<rw_access>(cgh));\n")
         bigVec ++
     concatMap
         (\(ResultStg id tn mem) -> let (view, strides) = viewType mem tn "accessor" in
