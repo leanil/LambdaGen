@@ -19,7 +19,8 @@ newtype CodeGenT = CodeGenT [String] deriving Show
 codeGenAlg :: (Result ∈ fields, ResultPack ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) =>
     RAlgebra (Cofree ExprF (R fields)) CodeGenT
 
-codeGenAlg (r ::< Scalar s) = CodeGenT [""]
+codeGenAlg ((getName -> "result") ::< Scalar s) = CodeGenT ["result=" ++ show s]
+codeGenAlg (r ::< Scalar s) = mkRoot r (getName r ++ "=" ++ show s) "" []
 
 codeGenAlg (r ::< VectorView id d s) = CodeGenT [""]
 
@@ -27,13 +28,16 @@ codeGenAlg (r ::< VectorView id d s) = CodeGenT [""]
 --     ("make_vector({" ++ intercalate "," strs ++ "})", or bools)
 
 codeGenAlg (r ::< Addition (ra :< _,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs))) =
-    mkRoot r (withNL a ++ withNL b ++ getName r ++ "=" ++ getName ra ++ "+" ++ getName rb) (bs ++ as)
+    mkRoot r code code (bs ++ as) where
+        code = withNL a ++ withNL b ++ getName r ++ "=" ++ getName ra ++ "+" ++ getName rb
 
 codeGenAlg (r ::< Multiplication (ra :< _,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs))) =
-    mkRoot r (withNL a ++ withNL b ++ getName r ++ "=" ++ getName ra ++ "*" ++ getName rb) (bs ++ as)
+    mkRoot r code code (bs ++ as) where
+        code = withNL a ++ withNL b ++ getName r ++ "=" ++ getName ra ++ "*" ++ getName rb
 
 codeGenAlg (r ::< Apply (_,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs))) =
-    mkRoot r (decorate r $ withNL b ++ a ++ "(" ++ getName rb ++ ")") (bs ++ as) where
+    mkRoot r code code (bs ++ as) where
+        code = decorate r $ withNL b ++ a ++ "(" ++ getName rb ++ ")"
         decorate (getType -> Fix Arrow{}) s = s
         decorate _                        s = s ++ "(" ++ getName r ++ ")"
 
@@ -50,6 +54,7 @@ codeGenAlg (r@(getType -> (Fix (Arrow b _))) ::< Lambda id _ (_,CodeGenT (a:as))
      mkParam r = mkView r
      mkView (countDims -> ds) = fst $ viewType (ds,[]) 1 "accessor"
 
+codeGenAlg ((getName -> "result") ::< Variable id _) = CodeGenT ["result=" ++ id]
 codeGenAlg (r ::< Variable id _) = CodeGenT [""]
 
 codeGenAlg (r ::< Map (_,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs))) =
@@ -71,11 +76,11 @@ mkPar r@(snd . getParData -> Just t) vec hof body groups =
 mkPar (snd . getParData -> Nothing) vec hof body groups =
     CodeGenT $ (vec ++ hof ++ "(" ++ body ++ ")") : groups
 
-mkRoot :: (ParData ∈ fields, ResultPack ∈ fields) => R fields -> String -> [String] -> CodeGenT
-mkRoot r@(snd . getParData -> Just 1) code groups =
+mkRoot :: (ParData ∈ fields, ResultPack ∈ fields) => R fields -> String -> String -> [String] -> CodeGenT
+mkRoot r@(snd . getParData -> Just 1) code _ groups =
     CodeGenT $ "" : mkCommandGroup r (wrap code) : groups where
         wrap code = "act_cgh->single_task<class SingleKernel>([=] () mutable {\n" ++ (indent "\t" (code ++ ";")) ++ "});"
-mkRoot (snd . getParData -> Nothing) code groups = CodeGenT $ code : groups
+mkRoot (snd . getParData -> Nothing) _ code groups = CodeGenT $ code : groups
 
 mkCommandGroup :: ResultPack ∈ fields => R fields -> String -> String
 mkCommandGroup (fieldVal ([] :: [ResultPack]) -> ResultPack (stg,bigVec)) s =

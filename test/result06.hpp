@@ -12,8 +12,8 @@ View<double*,double,3,3> evaluator(std::map<std::string, double*> bigVectors){
 	cl::sycl::queue deviceQueue;
 	deviceQueue.submit([&] (cl::sycl::handler &cgh) {
 		act_cgh = &cgh;
-		View<accessor,double,3>a844138389(std::array<size_t,1>{1},b_a844138389.get_access<rw_access>(cgh));
-		View<accessor,double,3>b1838073155(std::array<size_t,1>{1},b_b1838073155.get_access<rw_access>(cgh));
+		View<accessor,double,3> a844138389(std::array<size_t,1>{1},b_a844138389.get_access<rw_access>(cgh));
+		View<accessor,double,3> b1838073155(std::array<size_t,1>{1},b_b1838073155.get_access<rw_access>(cgh));
 		View<accessor,double,3,3> v_2147482884(std::array<size_t,2>{3,1},b_2147482884.get_access<rw_access>(cgh));
 		act_cgh->single_task<class SingleKernel>([=] () mutable {
 			[=](View<accessor,double,3> v1){return

@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, TypeFamilies #-}
 
 import CodeGeneration
+import ConstFold
 import CostEstimation
 import Cpp
 import ErrorTest
@@ -25,15 +26,16 @@ process expr =
     para (annotatePara codeGenAlg) $
     cata (annotate collectStgAlg) $
     assignStorage $
-    parallelize 4 expr
+    parallelize 4 $
+    cata constFoldAlg expr
 
 main = do
     let tcd = cata (annotate typecheckAlg) test
     case fieldVal ([] :: [TypecheckT]) $ extract tcd of
         (Left _) -> do
             let prd = process tcd
-            writeFile "test/result.hpp" $ createEvaluator $ extract prd
-            putStr $ printExpr (Proxy :: Proxy (R '[{-TypecheckT,ParData,-}ResultPack])) prd
+            writeFile "../test/result.hpp" $ createEvaluator $ extract prd
+            putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT, ParData, Result])) prd
         (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
             printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd

@@ -74,7 +74,15 @@ test11 =
             a)
         b
 
-funcTests = [test1, test2, test3, test6, test7, test8, test9, test10, test11]
+test12 =
+    mkMap
+        (app
+            (lam x (lam y 
+                (add (mul y (scl 0)) x)))
+            (scl 3))
+        a
+
+funcTests = [test1, test2, test3, test6, test7, test8, test9, test10, test11, test12]
 
     
 

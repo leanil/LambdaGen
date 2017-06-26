@@ -13,8 +13,8 @@ View<double*,double,2,2> evaluator(std::map<std::string, double*> bigVectors){
 	cl::sycl::queue deviceQueue;
 	deviceQueue.submit([&] (cl::sycl::handler &cgh) {
 		act_cgh = &cgh;
-		View<accessor,double,2,3>mat844138389(std::array<size_t,2>{3,1},b_mat844138389.get_access<rw_access>(cgh));
-		View<accessor,double,2,3>mat1838073155(std::array<size_t,2>{1,2},b_mat1838073155.get_access<rw_access>(cgh));
+		View<accessor,double,2,3> mat844138389(std::array<size_t,2>{3,1},b_mat844138389.get_access<rw_access>(cgh));
+		View<accessor,double,2,3> mat1838073155(std::array<size_t,2>{1,2},b_mat1838073155.get_access<rw_access>(cgh));
 		View<accessor,double,2,2> v_2147482884(std::array<size_t,2>{2,1},b_2147482884.get_access<rw_access>(cgh));
 		View<accessor,double,3> v_203958725(std::array<size_t,1>{1},b_203958725.get_access<rw_access>(cgh));
 		act_cgh->single_task<class SingleKernel>([=] () mutable {

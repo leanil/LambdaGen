@@ -1,5 +1,5 @@
+rm -f result*.hpp out.txt eval
 runhaskell -i../src ../src/Test.hs
-rm -f result.hpp out.txt eval
 for test in result*.hpp; do
 	echo $test
 	mv $test result.hpp

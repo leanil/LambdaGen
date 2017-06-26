@@ -74,7 +74,9 @@ assignHelper (g, True) id =
         Just s  -> (Std $ Implicit s, g')
 
 assignStorage :: ParData ∈ fields => Cofree ExprF (R fields) -> Cofree ExprF (R (Result ': fields))
-assignStorage e = ana assignStgAlg (e,(mkStdGen 0, True))
+assignStorage e = root $ ana assignStgAlg (e,(mkStdGen 0, True)) where
+    root t@((getPrimary . fieldVal ([] :: [Result]) -> Prealloc _) :< _) = t
+    root (r :< t) = rput (Identity $ Std $ Prealloc 0) r :< t
 
 dims :: [Int] -> Int -> String
 dims d 1 = concatMap (("," ++) . show) d
