@@ -5,8 +5,8 @@ import LinAlg
 import Type
 
 matVecMul =
-    let a = 16
-        b = 10^7 in
+    let a = 2^13
+        b = 2^13 in
     mkMap
         (app (dotProd b) (vecView "vec" [b]))
         (vecView "mat" [a,b])
