@@ -24,44 +24,44 @@ getPrimary :: Result -> ResultId
 getPrimary (Std x) = x
 getPrimary (Red (x,_)) = x
 
-assignStgAlg :: ParData ∈ fields => CoAlgebra (Cofree ExprF (R (Result ': fields))) ((Cofree ExprF (R fields)), AssignStgT)
+assignStgAlg :: ParData ∈ fields => CoAlgebra (Cofree ExprF Result) ((Cofree ExprF (R fields)), AssignStgT)
 
-assignStgAlg (r :< Scalar x, s) = (Identity (fst $ assignHelper s (Just $ show x)) :& r) ::< Scalar x
+assignStgAlg (r :< Scalar x, s) = fst (assignHelper s (Just $ show x)) ::< Scalar x
 
-assignStgAlg (r :< VectorView id a b, (g, True)) = (Identity (Std $ Implicit viewName) :& r) ::< VectorView id a b where
+assignStgAlg (r :< VectorView id a b, (g, True)) = Std (Implicit viewName) ::< VectorView id a b where
     viewName = id ++ show (fst $ next g)
 
-assignStgAlg (r :< Vector elements, s) = (Identity s' :& r) ::< (Vector $ zip elements (map (,True) $ unfoldr (Just .split) g'))where
+assignStgAlg (r :< Vector elements, s) = s' ::< (Vector $ zip elements (map (,True) $ unfoldr (Just .split) g'))where
     (s', g') = assignHelper s Nothing
 
-assignStgAlg (r :< Addition a b, s) = (Identity s' :& r) ::< Addition (a,(g1,True)) (b,(g2,True)) where
-    (s', g') = assignHelper s Nothing
-    (g1, g2) = split g'
-
-assignStgAlg (r :< Multiplication a b, s) = (Identity s' :& r) ::< Multiplication (a,(g1,True)) (b,(g2,True)) where
+assignStgAlg (r :< Addition a b, s) = s' ::< Addition (a,(g1,True)) (b,(g2,True)) where
     (s', g') = assignHelper s Nothing
     (g1, g2) = split g'
 
-assignStgAlg (r :< Apply a b, s) = (Identity s' :& r) ::< Apply (a,(g1,False)) (b,(g2,True)) where
+assignStgAlg (r :< Multiplication a b, s) = s' ::< Multiplication (a,(g1,True)) (b,(g2,True)) where
     (s', g') = assignHelper s Nothing
     (g1, g2) = split g'
 
-assignStgAlg (r :< Lambda i t a, s) = (Identity (Std Inherit) :& r) ::< Lambda i t (a,s)
+assignStgAlg (r :< Apply a b, s) = s' ::< Apply (a,(g1,False)) (b,(g2,True)) where
+    (s', g') = assignHelper s Nothing
+    (g1, g2) = split g'
 
-assignStgAlg (r :< Variable id t, s) = (Identity (fst $ assignHelper s (Just id)) :& r) ::< Variable id t
+assignStgAlg (r :< Lambda i t a, s) = Std Inherit ::< Lambda i t (a,s)
 
-assignStgAlg (r :< Map a b, s) = (Identity s' :& r) ::< Map (a,(g1,False)) (b,(g2,True)) where
+assignStgAlg (r :< Variable id t, s) = fst (assignHelper s (Just id)) ::< Variable id t
+
+assignStgAlg (r :< Map a b, s) = s' ::< Map (a,(g1,False)) (b,(g2,True)) where
         (s', g') = assignHelper s Nothing
         (g1, g2) = split g'
 
-assignStgAlg (r :< Reduce a b, s) = (Identity (mkResult r) :& r) ::< Reduce (a,(g1,False)) (b,(g2,True)) where
+assignStgAlg (r :< Reduce a b, s) = mkResult r ::< Reduce (a,(g1,False)) (b,(g2,True)) where
         (s'@(Std x), g') = assignHelper s Nothing
         (y, g'') = next g'
         (g1, g2) = split g''
         mkResult (snd . getParData -> Just _) = Red (x,Prealloc y)
         mkResult (snd . getParData -> Nothing) = s'
 
-assignStgAlg (r :< ZipWith a b c, s) = (Identity s' :& r) ::< ZipWith (a,(g1,False)) (b,(g2,True)) (c,(g3,True)) where
+assignStgAlg (r :< ZipWith a b c, s) = s' ::< ZipWith (a,(g1,False)) (b,(g2,True)) (c,(g3,True)) where
         (s', g') = assignHelper s Nothing
         (g1, (g2, g3)) = fmap split $ split g'
 
@@ -74,7 +74,7 @@ assignHelper (g, True) id =
         Just s  -> (Std $ Implicit s, g')
 
 assignStorage :: ParData ∈ fields => Cofree ExprF (R fields) -> Cofree ExprF (R (Result ': fields))
-assignStorage e = root $ ana assignStgAlg (e,(mkStdGen 0, True)) where
+assignStorage e = root $ ana (annotateAna assignStgAlg) (e,(mkStdGen 0, True)) where
     root t@((getPrimary . fieldVal -> Prealloc _) :< _) = t
     root (r :< t) = rput (Identity $ Std $ Prealloc 0) r :< t
 
