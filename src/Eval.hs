@@ -18,7 +18,7 @@ import System.IO (print)
 
 main =
     let tc = cata (annotate typecheckAlg) input in
-    case fieldVal ([] :: [TypecheckT]) $ extract tc of
+    case fieldVal $ extract tc of
     (Left _) ->       writeFile "result.hpp" $
                       createEvaluator $ extract $
                       para (annotatePara codeGenAlg) $

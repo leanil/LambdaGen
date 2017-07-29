@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts, TypeApplications, TypeFamilies #-}
 
 import CodeGeneration
 import ConstFold
@@ -21,7 +21,7 @@ import Text.Printf (printf)
 
 process test result =
     let tc = cata (annotate typecheckAlg) test in
-    case fieldVal ([] :: [TypecheckT]) $ extract tc of
+    case fieldVal @TypecheckT $ extract tc of
     (Left _) -> writeFile result $
                 createEvaluator $ extract $
                 para (annotatePara codeGenAlg) $

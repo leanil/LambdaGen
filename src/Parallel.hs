@@ -58,4 +58,4 @@ parallelize t = root . ana (parallelizerAlg t) . (,None) where
     root (r :< t) = rput (Identity ((1, Just 1) :: ParData)) r :< t
 
 getParData :: ParData ∈ fields => R fields -> ParData
-getParData (fieldVal ([] :: [ParData]) -> p) = p
+getParData (fieldVal -> p) = p

@@ -5,7 +5,9 @@ module Recursion where
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree ((:<)))
 import qualified Control.Comonad.Trans.Cofree as CofreeT (CofreeF ((:<)))
+import Control.Comonad.Trans.Cofree (headF, tailF)
 import Data.Functor.Foldable
+import Data.Proxy (Proxy(Proxy))
 import Data.Vinyl
 import Data.Vinyl.Functor 
 
@@ -20,12 +22,17 @@ type CoAlgebra t a = a -> Base t a
 annotate :: Functor f => 
             Algebra (Cofree f (R old)) new ->
             Algebra (Cofree f (R old)) (Cofree f (R (new ': old)))
-annotate alg (old ::< f) = (Identity (alg (old ::< fmap (getIdentity . rget ([] :: [new]) . extract) f)) :& old) :< f
+annotate alg (old ::< f) = (Identity (alg (old ::< fmap (fieldVal . extract) f)) :& old) :< f
 
 annotatePara :: Functor f =>
                 RAlgebra (Cofree f (R old)) new ->
                 RAlgebra (Cofree f (R old)) (Cofree f (R (new ': old)))
-annotatePara alg (old ::< f) = (Identity (alg (old ::< fmap (fmap (getIdentity . rget ([] :: [new]) . extract)) f)) :& old) :< fmap snd f
+annotatePara alg (old ::< f) = (Identity (alg (old ::< fmap (fmap (fieldVal . extract)) f)) :& old) :< fmap snd f
 
-fieldVal :: a ∈ fields => sing a -> R fields -> a
-fieldVal a = getIdentity . rget a
+annotateAna :: Functor f =>
+               CoAlgebra (Cofree f new) (Cofree f (R old), seed) -> 
+               CoAlgebra (Cofree f (R (new ': old))) (Cofree f (R old), seed)
+annotateAna alg a@(old :< _,_) = (Identity (headF tmp) :& old) ::< tailF tmp where tmp = alg a
+
+fieldVal :: a ∈ fields => R fields -> a
+fieldVal = getIdentity . rget (Proxy :: Proxy a)

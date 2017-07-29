@@ -20,7 +20,7 @@ createEvaluator expr =
     "\treturn result;\n}\n"
     where
         headers = ["\"helper.h\"", "\"my_sycl.h\"", "\"View.h\"", "<map>", "<string>"]
-        resPack = fieldVal ([] :: [ResultPack]) expr
+        resPack = fieldVal expr
         returnType = getReturnType resPack
         signature = fst returnType ++ " evaluator(std::map<std::string, double*> bigVectors)"
         getMemStruct (ResultPack (ResultStg _ _ mem : _,_)) = mem

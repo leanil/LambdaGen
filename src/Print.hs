@@ -17,7 +17,7 @@ inc :: IndentT -> IndentT
 inc (IndentT i) = IndentT $ i+1
 
 getIndent :: IndentT ∈ fields => R fields -> Int
-getIndent (fieldVal ([] :: [IndentT]) -> IndentT i) = i
+getIndent (fieldVal -> IndentT i) = i
 
 indent :: Cofree ExprF (R fields) -> Cofree ExprF (R (IndentT ': fields))
 indent e = ana indentAlg (e,IndentT 0)

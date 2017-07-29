@@ -75,7 +75,7 @@ assignHelper (g, True) id =
 
 assignStorage :: ParData ∈ fields => Cofree ExprF (R fields) -> Cofree ExprF (R (Result ': fields))
 assignStorage e = root $ ana assignStgAlg (e,(mkStdGen 0, True)) where
-    root t@((getPrimary . fieldVal ([] :: [Result]) -> Prealloc _) :< _) = t
+    root t@((getPrimary . fieldVal -> Prealloc _) :< _) = t
     root (r :< t) = rput (Identity $ Std $ Prealloc 0) r :< t
 
 dims :: [Int] -> Int -> String
@@ -110,7 +110,7 @@ collectStgAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) 
 
 collectStgAlg (r ::< Scalar{}) = getStgAndDims r
 
-collectStgAlg ((fieldVal ([] :: [Result]) -> Std (Implicit id)) ::< VectorView dataId d s) = ResultPack([], [BigVector id dataId (d,s)])
+collectStgAlg ((fieldVal -> Std (Implicit id)) ::< VectorView dataId d s) = ResultPack([], [BigVector id dataId (d,s)])
 
 collectStgAlg (r ::< Vector elements) = getStgAndDims r <> mconcat elements
 
@@ -132,8 +132,8 @@ collectStgAlg (r ::< ZipWith a b c) = getStgAndDims r <> a <> b <> c
 
 getStgAndDims :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => R (fields) -> ResultPack
 getStgAndDims r = ResultPack (std r ++ temp r, []) where
-    std (getPrimary . fieldVal ([] :: [Result]) &&& fst . getParData -> (Prealloc x, t)) = [ResultStg x t (ds, defaultStrides ds)]
-    std (getPrimary . fieldVal ([] :: [Result]) -> _) = []
-    temp (fieldVal ([] :: [Result]) &&& snd . getParData -> (Red (_,Prealloc x), Just t)) = [ResultStg x t (ds, defaultStrides ds)]
+    std (getPrimary . fieldVal &&& fst . getParData -> (Prealloc x, t)) = [ResultStg x t (ds, defaultStrides ds)]
+    std (getPrimary . fieldVal -> _) = []
+    temp (fieldVal &&& snd . getParData -> (Red (_,Prealloc x), Just t)) = [ResultStg x t (ds, defaultStrides ds)]
     temp _ = []
     ds = countDims $ getType r

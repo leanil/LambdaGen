@@ -63,7 +63,7 @@ codeGenAlg (r ::< Map (_,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs))) =
 
 codeGenAlg (r ::< Reduce (_,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs))) =
     mkPar r (withNL b) "Reduce" (a ++ "," ++ getName rb ++ "," ++ getName r ++ mkTemp r) (bs ++ as) where
-        mkTemp (fieldVal ([] :: [Result]) -> Red (_,Prealloc x)) = ",v_" ++ show x
+        mkTemp (fieldVal -> Red (_,Prealloc x)) = ",v_" ++ show x
         mkTemp _                                          = ""
 
 codeGenAlg (r ::< ZipWith (_,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs)) (rc :< _,CodeGenT (c:cs))) =
@@ -83,7 +83,7 @@ mkRoot r@(snd . getParData -> Just 1) code _ groups =
 mkRoot (snd . getParData -> Nothing) _ code groups = CodeGenT $ code : groups
 
 mkCommandGroup :: ResultPack ∈ fields => R fields -> String -> String
-mkCommandGroup (fieldVal ([] :: [ResultPack]) -> ResultPack (stg,bigVec)) s =
+mkCommandGroup (fieldVal -> ResultPack (stg,bigVec)) s =
     "deviceQueue.submit([&] (cl::sycl::handler &cgh) {\n" ++
     "\tact_cgh = &cgh;\n" ++
     concatMap
@@ -103,11 +103,11 @@ withNL [] = []
 withNL s  = s ++ ",\n"
 
 getName :: (Result ∈ fields, ParData ∈ fields) => R fields -> String
-getName (getPrimary . fieldVal ([] :: [Result]) -> Inherit) = "result"
-getName (getPrimary . fieldVal ([] :: [Result]) -> Implicit s) = s
-getName (getPrimary . fieldVal ([] :: [Result]) &&& fst . getParData -> (Prealloc x, tn))
+getName (getPrimary . fieldVal -> Inherit) = "result"
+getName (getPrimary . fieldVal -> Implicit s) = s
+getName (getPrimary . fieldVal &&& fst . getParData -> (Prealloc x, tn))
     | tn == 1 = "v_" ++ show x
     | tn > 1  = "v_" ++ show x ++ "[thread_id]"
 
 getCode :: CodeGenT ∈ fields => R fields -> String
-getCode (fieldVal ([] :: [CodeGenT]) -> CodeGenT groups) = concat $ reverse groups
+getCode (fieldVal -> CodeGenT groups) = concat $ reverse groups

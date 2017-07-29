@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, TypeFamilies #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, TypeApplications, TypeFamilies #-}
 
 import CodeGeneration
 import ConstFold
@@ -31,7 +31,7 @@ process expr =
 
 main = do
     let tcd = cata (annotate typecheckAlg) test
-    case fieldVal ([] :: [TypecheckT]) $ extract tcd of
+    case fieldVal @TypecheckT $ extract tcd of
         (Left _) -> do
             let prd = process tcd
             writeFile "../test/result.hpp" $ createEvaluator $ extract prd

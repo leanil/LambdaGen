@@ -41,4 +41,4 @@ costEstAlg (t ::< ZipWith (_,f) (_,v1) (_,v2)) = Cost $ cost f * getDim t + cost
     getDim (getType -> (Fix (Power _ (Fix (Dim s))))) = s
 
 getCost :: Cost ∈ fields => R fields -> Int
-getCost = cost . fieldVal ([] :: [Cost])
+getCost = cost . fieldVal
