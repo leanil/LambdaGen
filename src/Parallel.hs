@@ -15,7 +15,7 @@ import Data.Functor.Foldable (ana)
 data ParState = None | Started Int | Full Int
 type ParData = (Int, Maybe Int) -- (threads at this point, threads to start here)
 
-parallelizerAlg :: TypecheckT ∈ fields => Int -> CoAlgebra (Cofree ExprF ParData) ((Cofree ExprF (R fields)), ParState)
+parallelizerAlg :: TypecheckT ∈ fields => Int -> CoAlgebra (Cofree ExprF ParData) (Cofree ExprF (R fields), ParState)
 
 parallelizerAlg _ (r :< Scalar x, p) = parData p ::< Scalar x
 

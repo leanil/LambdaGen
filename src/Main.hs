@@ -20,7 +20,7 @@ import Data.List (intercalate)
 import Data.Proxy (Proxy(Proxy))
 import System.IO (print)
 
-test = test6
+test = test1
 
 process expr =
     para (annotatePara codeGenAlg) $
@@ -33,9 +33,11 @@ main = do
     let tcd = cata (annotate typecheckAlg) test
     case fieldVal @TypecheckT $ extract tcd of
         (Left _) -> do
-            let prd = process tcd
-            writeFile "../test/result.hpp" $ createEvaluator $ extract prd
-            putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT, ParData, Result])) prd
+            -- let prd = process tcd
+            -- writeFile "../test/result.hpp" $ createEvaluator $ extract prd
+            -- putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT, ParData, Result])) prd
+            let var1 = cata constFoldAlg tcd
+            putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) var1
         (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
             printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd
