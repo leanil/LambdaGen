@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, ScopedTypeVariables, TypeOperators, ViewPatterns #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, ScopedTypeVariables, TupleSections, TypeOperators, ViewPatterns #-}
 
 module Print where
 
@@ -23,28 +23,7 @@ indent :: Cofree ExprF (R fields) -> Cofree ExprF (R (IndentT ': fields))
 indent e = ana indentAlg (e,IndentT 0)
 
 indentAlg :: CoAlgebra (Cofree ExprF (R (IndentT ': fields))) ((Cofree ExprF (R fields)), IndentT)
-
-indentAlg (r :< Scalar x, i) = (Identity i :& r) ::< Scalar x
-
-indentAlg (r :< Vector elements, i) = (Identity i :& r) ::< (Vector $ zip elements $ repeat $ inc i)
-
-indentAlg (r :< VectorView id a b, i) = (Identity i :& r) ::< VectorView id a b
-
-indentAlg (r :< Addition a b, i) = (Identity i :& r) ::< Addition (a, inc i) (b, inc i)
-
-indentAlg (r :< Multiplication a b, i) = (Identity i :& r) ::< Multiplication (a, inc i) (b, inc i)
-
-indentAlg (r :< Apply a b, i) = (Identity i :& r) ::< Apply (a, inc i) (b, inc i)
-
-indentAlg (r :< Lambda id t a, i) = (Identity i :& r) ::< Lambda id t (a, inc i)
-
-indentAlg (r :< Variable id t, i) = (Identity i :& r) ::< Variable id t
-
-indentAlg (r :< Map a b, i) = (Identity i :& r) ::< Map (a, inc i) (b, inc i)
-
-indentAlg (r :< Reduce a b, i) = (Identity i :& r) ::< Reduce (a, inc i) (b, inc i)
-
-indentAlg (r :< ZipWith a b c, i) = (Identity i :& r) ::< ZipWith (a, inc i) (b, inc i) (c, inc i)
+indentAlg (r :< node, i) = (Identity i :& r) ::< fmap (,inc i) node
 
 printerAlg :: forall fields select . (IndentT ∈ fields, select ⊆ fields, RecAll Identity select Show) =>
     Proxy (R select) -> Algebra (Cofree ExprF (R fields)) String
@@ -70,6 +49,8 @@ printerAlg _ (r ::< Map a b) = mkTabs r ++ "Map: " ++ show (rcast r :: R select)
 printerAlg _ (r ::< Reduce a b) = mkTabs r ++ "Reduce: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
 
 printerAlg _ (r ::< ZipWith a b c) = mkTabs r ++ "ZipWith: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b ++ c
+
+printerAlg _ (r ::< Compose a b) = mkTabs r ++ "Compose: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
 
 printExpr :: (select ⊆ (IndentT : fields), RecAll Identity select Show) =>
      Proxy (R select) -> Cofree ExprF (R fields) ->  String

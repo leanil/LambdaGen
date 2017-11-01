@@ -1,4 +1,6 @@
-{-# LANGUAGE DataKinds, DeriveFunctor, PatternSynonyms, ScopedTypeVariables, TypeOperators #-}
+{-# LANGUAGE DataKinds, DeriveFunctor, PatternSynonyms, TypeOperators #-}
+
+module Replace where
 
 import Expr
 import Recursion
@@ -7,114 +9,111 @@ import Control.Comonad.Cofree (Cofree ((:<)))
 import Data.Functor.Foldable
 import qualified Data.Map.Strict as M
 import Data.Vinyl
-import Data.Vinyl.Functor 
 
 data PExprF a
-    = PScalar String (String,Maybe Double)
-    | PAddition String a a
-    | PMultiplication String a a
-    | PVectorView String (String,Maybe String) (String,Maybe [Int]) (String,Maybe [Int])
-    | PApply String a a
-    | PLambda String (String,Maybe String) (String,Maybe Type) a
-    | PVariable String (String,Maybe String) (String,Maybe Type)
-    | PMap String a a
-    | PReduce String a a
-    | PZipWith String a a a
+    = PScalar String
+    | PAddition a a
+    | PMultiplication a a
+    | PVectorView String
+    | PApply a a
+    | PLambda String a
+    | PVariable String
+    | PMap a a
+    | PReduce a a
+    | PZipWith a a a
+    | PCompose a a
     | PStar String
     deriving (Eq, Functor, Show)
 
 type PExpr = Fix PExprF
 
-pattern FPScalar n a           = Fix (PScalar n a)
-pattern FPAddition n a b       = Fix (PAddition n a b)
-pattern FPMultiplication n a b = Fix (PMultiplication n a b)
-pattern FPVectorView n a b c   = Fix (PVectorView n a b c)
-pattern FPApply n lam val      = Fix (PApply n lam val)
-pattern FPLambda n a b body    = Fix (PLambda n a b body)
-pattern FPVariable n a b       = Fix (PVariable n a b)
-pattern FPMap n lam v          = Fix (PMap n lam v)
-pattern FPReduce n lam v       = Fix (PReduce n lam v)
-pattern FPZipWith n lam v1 v2  = Fix (PZipWith n lam v1 v2)
-pattern FPStar id              = Fix (PStar id)
+pattern FPScalar n           = Fix (PScalar n)
+pattern FPAddition a b       = Fix (PAddition a b)
+pattern FPMultiplication a b = Fix (PMultiplication a b)
+pattern FPVectorView n       = Fix (PVectorView n)
+pattern FPApply lam val      = Fix (PApply lam val)
+pattern FPLambda n body      = Fix (PLambda n body)
+pattern FPVariable n         = Fix (PVariable n)
+pattern FPMap lam v          = Fix (PMap lam v)
+pattern FPReduce lam v       = Fix (PReduce lam v)
+pattern FPZipWith lam v1 v2  = Fix (PZipWith lam v1 v2)
+pattern FPCompose a b        = Fix (PCompose a b)
+pattern FPStar id            = Fix (PStar id)
 
-pScl n a           = Fix $ PScalar n (a,Nothing)
-pAdd n a b         = Fix $ PAddition n a b
-pMul n a b         = Fix $ PMultiplication n a b
-pVecView n a b c   = Fix $ PVectorView n (a,Nothing) (b,Nothing) (c,Nothing)
-pApp n l v         = Fix $ PApply n l v
-pLam n a b body    = Fix $ PLambda n (a,Nothing) (b,Nothing) body
-pVar n a b         = Fix $ PVariable n (a,Nothing) (b,Nothing)
-pMap n l v         = Fix $ PMap n l v
-pReduce n l v      = Fix $ PReduce n l v
-pZipWith n l v1 v2 = Fix $ PZipWith n l v1 v2
+pScl n           = Fix $ PScalar n
+pAdd a b         = Fix $ PAddition a b
+pMul a b         = Fix $ PMultiplication a b
+pVecView n       = Fix $ PVectorView n
+pApp l v         = Fix $ PApply l v
+pLam n body      = Fix $ PLambda n body
+pVar n           = Fix $ PVariable n
+pMap l v         = Fix $ PMap l v
+pReduce l v      = Fix $ PReduce l v
+pZipWith l v1 v2 = Fix $ PZipWith l v1 v2
+pComp a b        = Fix $ PCompose a b
+pStar n          = Fix $ PStar n
 
-data MatchVal fields
-    = Expr  { getExpr  :: Expr fields }
-    | Type  { getType  :: Type }
-    | Str   { getStr   :: String }
-    | Val   { getVal   :: Double }
-    | List  { getList  :: [Int] }
-    | Annot { getAnnot :: R fields }
-
-type Match fields = M.Map String (MatchVal fields)
-
-mGetExpr match (id,Nothing) = getExpr $ match M.! id
-mGetExpr match (_,Just a)   = a
-mGetType match (id,Nothing) = getType $ match M.! id
-mGetType match (_,Just a)   = a
-mGetStr  match (id,Nothing) = getStr $ match M.! id
-mGetStr  match (_,Just a)   = a
-mGetVal  match (id,Nothing) = getVal $ match M.! id
-mGetVal  match (_,Just a)   = a
-mGetList match (id,Nothing) = getList $ match M.! id
-mGetList match (_,Just a)   = a
-mGetAnnot match = getAnnot . (match M.!)
-
-makeComp :: (Expr fields, PExpr) -> Either (Maybe (Match fields)) (CofreeF PExprF (R fields) (Expr fields, PExpr))
-makeComp (FScalar r i, FPScalar n (id,_))                              = Right $ r ::< PScalar n (id,Just i)
-makeComp (FAddition r a b, FPAddition n c d)                           = Right $ r ::< PAddition n (a,c) (b,d)
-makeComp (FMultiplication r a b, FPMultiplication n c d)               = Right $ r ::< PMultiplication n (a,c) (b,d)
-makeComp (FVectorView r a b c, FPVectorView n (id1,_) (id2,_) (id3,_)) = Right $ r ::< PVectorView n (id1,Just a) (id2,Just b) (id3,Just c)
-makeComp (FApply r a b, FPApply n c d)                                 = Right $ r ::< PApply n (a,c) (b,d)
-makeComp (FLambda r a b c, FPLambda n (id1,_) (id2,_) d)               = Right $ r ::< PLambda n (id1,Just a) (id2,Just b) (c,d)
-makeComp (FVariable r a b, FPVariable n (id1,_) (id2,_))               = Right $ r ::< PVariable n (id1,Just a) (id2,Just b)
-makeComp (FMap r a b, FPMap n c d)                                     = Right $ r ::< PMap n (a,c) (b,d)
-makeComp (FReduce r a b, FPReduce n c d)                               = Right $ r ::< PReduce n (a,c) (b,d)
-makeComp (FZipWith r a b c, FPZipWith n d e f)                         = Right $ r ::< PZipWith n (a,d) (b,e) (c,f)
-makeComp (subTree, FPStar id)                                          = Left $ Just $ M.singleton id (Expr subTree)
-makeComp _                                                             = Left Nothing
-
-evalComp :: CofreeF PExprF (R fields) (Maybe (Match fields)) -> (Maybe (Match fields))
-evalComp (r ::< PScalar n (id,Just a))                                = Just $ M.fromList [(n,Annot r),(id,Val a)]
-evalComp (r ::< PAddition n (Just a) (Just b))                        = Just $ M.insert n (Annot r) $ M.union a b
-evalComp (r ::< PMultiplication n (Just a) (Just b))                  = Just $ M.insert n (Annot r) $ M.union a b
-evalComp (r ::< PVectorView n (id1,Just a) (id2,Just b) (id3,Just c)) = Just $ M.fromList [(n,Annot r),(id1,Str a),(id2,List b),(id3,List c)]
-evalComp (r ::< PApply n (Just a) (Just b))                           = Just $ M.insert n (Annot r) $ M.union a b
-evalComp (r ::< PLambda n (id1,Just a) (id2,Just b) (Just c))         = Just $ M.union c $ M.fromList [(n,Annot r),(id1,Str a),(id2,Type b)]
-evalComp (r ::< PVariable n (id1,Just a) (id2,Just b))                = Just $ M.fromList [(n,Annot r),(id1,Str a),(id2,Type b)]
-evalComp (r ::< PMap n (Just a) (Just b))                             = Just $ M.insert n (Annot r) $ M.union a b
-evalComp (r ::< PReduce n (Just a) (Just b))                          = Just $ M.insert n (Annot r) $ M.union a b
-evalComp (r ::< PZipWith n (Just a) (Just b) (Just c))                = Just $ M.insert n (Annot r) $ M.unions [a,b,c]
-evalComp _                                                            = Nothing
+data MatchVal
+    = Expr { getExpr  :: Expr0 }
+    | Node { getNode  :: ExprF () }
     
+type Match = M.Map String MatchVal
 
-fillReplacement :: forall fields. (Match fields) -> PExpr -> Expr fields
+mGetExpr match id = getExpr $ match M.! id
+mGetNode match id = getNode $ match M.! id
+
+mSaveNode :: String -> ExprF Expr0 -> Maybe Match
+mSaveNode id n = Just $ M.singleton id $ Node $ fmap (const ()) n
+
+makeComp :: (Expr0, PExpr) -> Either (Maybe Match) (CofreeF ExprF (Maybe Match) (Expr0, PExpr))
+makeComp (_ :< n@Scalar{}, FPScalar id)                  = Right $ mSaveNode id n ::< castLeaf n
+makeComp (_ :< n@Addition{}, FPAddition c d)             = Right $ Nothing ::< zipExprF (,) n [c,d]
+makeComp (_ :< n@Multiplication{}, FPMultiplication c d) = Right $ Nothing ::< zipExprF (,) n [c,d]
+makeComp (_ :< n@VectorView{}, FPVectorView id)          = Right $ mSaveNode id n ::< castLeaf n
+makeComp (_ :< n@Apply{}, FPApply c d)                   = Right $ Nothing ::< zipExprF (,) n [c,d]
+makeComp (_ :< n@Lambda{}, FPLambda id d)                = Right $ mSaveNode id n ::< zipExprF (,) n [d]
+makeComp (_ :< n@Variable{}, FPVariable id)              = Right $ mSaveNode id n ::< castLeaf n
+makeComp (_ :< n@Map{}, FPMap c d)                       = Right $ Nothing ::< zipExprF (,) n [c,d]
+makeComp (_ :< n@Reduce{}, FPReduce c d)                 = Right $ Nothing ::< zipExprF (,) n [c,d]
+makeComp (_ :< n@ZipWith{}, FPZipWith d e f)             = Right $ Nothing ::< zipExprF (,) n [d,e,f]
+makeComp (_ :< n@Compose{}, FPCompose c d)               = Right $ Nothing ::< zipExprF (,) n [c,d]
+makeComp (subTree, FPStar id)                            = Left $ Just $ M.singleton id (Expr subTree)
+makeComp _                                               = Left Nothing
+
+evalComp :: CofreeF ExprF (Maybe Match) (Maybe Match) -> Maybe Match
+evalComp (m ::< Scalar{})                           = m
+evalComp (_ ::< Addition (Just a) (Just b))         = Just $ M.union a b
+evalComp (_ ::< Multiplication (Just a) (Just b))   = Just $ M.union a b
+evalComp (m ::< VectorView{})                       = m
+evalComp (_ ::< Apply (Just a) (Just b))            = Just $ M.union a b
+evalComp (Just m ::< Lambda _ _ (Just c))           = Just $ M.union m c
+evalComp (m ::< Variable{})                         = m
+evalComp (_ ::< Map (Just a) (Just b))              = Just $ M.union a b
+evalComp (_ ::< Reduce (Just a) (Just b))           = Just $ M.union a b
+evalComp (_ ::< ZipWith (Just a) (Just b) (Just c)) = Just $ M.unions [a,b,c]
+evalComp (_ ::< Compose (Just a) (Just b))          = Just $ M.union a b
+evalComp _                                          = Nothing
+    
+fillReplacement :: Match -> PExpr -> Expr0
 fillReplacement match = cata alg where
-    alg :: Algebra PExpr (Expr fields)
-    alg (PScalar n id)              = mGetAnnot match n :< Scalar (mGetVal match id)
-    alg (PAddition n a b)           = mGetAnnot match n :< Addition a b
-    alg (PMultiplication n a b)     = mGetAnnot match n :< Multiplication a b
-    alg (PVectorView n id dms strd) = mGetAnnot match n :< VectorView (mGetStr match id) (mGetList match dms) (mGetList match strd)
-    alg (PApply n a b)              = mGetAnnot match n :< Apply a b
-    alg (PLambda n id t a)          = mGetAnnot match n :< Lambda (mGetStr match id) (mGetType match t) a
-    alg (PVariable n id t)          = mGetAnnot match n :< Variable (mGetStr match id) (mGetType match t)
-    alg (PMap n l v)                = mGetAnnot match n :< Map l v
-    alg (PReduce n l v)             = mGetAnnot match n :< Reduce l v
-    alg (PZipWith n l v1 v2)        = mGetAnnot match n :< ZipWith l v1 v2
+    alg :: Algebra PExpr Expr0
+    alg (PScalar n)           = RNil :< castLeaf (mGetNode match n)
+    alg (PAddition a b)       = RNil :< Addition a b
+    alg (PMultiplication a b) = RNil :< Multiplication a b
+    alg (PVectorView n)       = RNil :< castLeaf (mGetNode match n)
+    alg (PApply a b)          = RNil :< Apply a b
+    alg (PLambda n a)         = RNil :< zipExprF (flip const) (mGetNode match n) [a]
+    alg (PVariable n)         = RNil :< castLeaf (mGetNode match n)
+    alg (PMap l v)            = RNil :< Map l v
+    alg (PReduce l v)         = RNil :< Reduce l v
+    alg (PZipWith l v1 v2)    = RNil :< ZipWith l v1 v2
+    alg (PCompose a b)        = RNil :< Compose a b
+    alg (PStar id)            = mGetExpr match id
 
-replaceAll :: PExpr -> PExpr -> Expr fields -> Expr fields
+replaceAll :: PExpr -> PExpr -> Expr fields -> Expr0
 replaceAll pat rep = cata replace where
-    replace :: Algebra (Expr fields) (Expr fields)
-    replace subTree = case elgot evalComp makeComp (embed subTree, pat) of
-                        (Just m) -> fillReplacement m rep
-                        Nothing  -> embed subTree
+    replace :: Algebra (Expr fields) Expr0
+    replace (_ ::< node) =
+        case elgot evalComp makeComp (RNil :< node, pat) of
+            (Just m) -> fillReplacement m rep
+            Nothing  -> RNil :< node

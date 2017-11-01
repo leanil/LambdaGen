@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, TypeOperators #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, TypeApplications, TypeOperators #-}
 
 module Typecheck where
 
@@ -12,7 +12,6 @@ import Data.Either.Combinators (fromLeft')
 import Data.Functor.Foldable
 import Data.Maybe
 import Data.Vinyl
-import Data.Vinyl.Functor
 
 type Error = String
 type TypecheckT = Either Type [Error]
@@ -96,6 +95,11 @@ typecheckAlg (_ ::< ZipWith a b c) =
                 | otherwise = Right $ catMaybes [eqCheck a d, eqCheck b f, eqCheck e g]
             zipCheck a b c = Right $ catMaybes [biLambdaCheck a, vectorCheck b, vectorCheck c]   
 
+typecheckAlg (_ ::< Compose (Left t1@(FArrow c d)) (Left t2@(FArrow a b)))
+    | b == c    = Left $ arrow a d
+    | otherwise = Right $ [showT t1 ++ " != " ++ showT t2]
+typecheckAlg (_ ::< Compose a b) = Right $ concat $ rights [a,b]
+
 eqCheck :: Type -> Type -> Maybe Error
 eqCheck a b
     | a == b = Nothing
@@ -118,4 +122,4 @@ vectorCheck (Fix (Power _ _)) = Nothing
 vectorCheck a = Just $ showT a ++ " not a vector"
 
 getType :: TypecheckT ∈ fields => R fields -> Type
-getType = fromLeft' . getIdentity . rget ([] :: [TypecheckT])
+getType = fromLeft' . fieldVal @TypecheckT

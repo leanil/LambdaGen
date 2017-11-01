@@ -1,7 +1,8 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor, PatternSynonyms #-}
 
 module Type where
 
+import Recursion
 import Data.Functor.Classes
 import Data.Functor.Foldable
 
@@ -39,3 +40,18 @@ power x y = Fix $ Power x y
 arrow :: Type -> Type -> Type
 arrow x y = Fix $ Arrow x y
 
+pattern FDouble    = Fix Double
+pattern FDim a     = Fix (Dim a)
+pattern FPower a b = Fix (Power a b)
+pattern FArrow a b = Fix (Arrow a b)
+
+dimCounterAlg :: Algebra Type [Int]
+
+dimCounterAlg (Dim s) = [s]
+
+dimCounterAlg (Power a b) = head b : a
+
+dimCounterAlg _ = []
+
+countDims :: Type -> [Int]
+countDims = cata dimCounterAlg

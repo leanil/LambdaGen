@@ -5,8 +5,8 @@ module Storage where
 import Expr
 import Parallel
 import Recursion
+import Type
 import Typecheck
-import TypePrinter
 import Control.Arrow
 import Control.Comonad.Cofree (Cofree(..))
 import Data.List (intercalate, unfoldr)
@@ -16,7 +16,7 @@ import Data.Vinyl.Functor (Identity(..))
 import Data.Functor.Foldable (ana)
 import System.Random
 
-type AssignStgT = (StdGen, Bool)
+type AssignStgT = (StdGen, Bool) -- (id generator, has to allocate)
 data ResultId = Inherit | Implicit String | Prealloc Int deriving Show
 data Result = Std ResultId | Red (ResultId, ResultId) deriving Show
 
@@ -26,52 +26,52 @@ getPrimary (Red (x,_)) = x
 
 assignStgAlg :: ParData ∈ fields => CoAlgebra (Cofree ExprF Result) ((Cofree ExprF (R fields)), AssignStgT)
 
-assignStgAlg (r :< Scalar x, s) = fst (assignHelper s (Just $ show x)) ::< Scalar x
+-- assignStgAlg (_ :< a, _) = Std Inherit ::< a
+assignStgAlg (_ :< a@Scalar{}, (_,False)) = Std Inherit ::< castLeaf a
+assignStgAlg (_ :< Scalar x, _) = Std (Implicit $ show x) ::< Scalar x
 
-assignStgAlg (r :< VectorView id a b, (g, True)) = Std (Implicit viewName) ::< VectorView id a b where
+assignStgAlg (_ :< VectorView id a b, (g, True)) = Std (Implicit viewName) ::< VectorView id a b where
     viewName = id ++ show (fst $ next g)
 
-assignStgAlg (r :< Vector elements, s) = s' ::< (Vector $ zip elements (map (,True) $ unfoldr (Just .split) g'))where
-    (s', g') = assignHelper s Nothing
+-- assignStgAlg (r :< Vector elements, s) = s' ::< (Vector $ zip elements (map (,True) $ unfoldr (Just .split) g'))where
+--     (s', g') = assignHelper s Nothing
 
-assignStgAlg (r :< Addition a b, s) = s' ::< Addition (a,(g1,True)) (b,(g2,True)) where
-    (s', g') = assignHelper s Nothing
-    (g1, g2) = split g'
+assignStgAlg (_ :< Addition a b, s) = r ::< Addition (a,(g1,True)) (b,(g2,True)) where
+    (r, [g1,g2]) = assignHelper s 2
 
-assignStgAlg (r :< Multiplication a b, s) = s' ::< Multiplication (a,(g1,True)) (b,(g2,True)) where
-    (s', g') = assignHelper s Nothing
-    (g1, g2) = split g'
+assignStgAlg (_ :< Multiplication a b, s) = r ::< Multiplication (a,(g1,True)) (b,(g2,True)) where
+    (r, [g1,g2]) = assignHelper s 2
 
-assignStgAlg (r :< Apply a b, s) = s' ::< Apply (a,(g1,False)) (b,(g2,True)) where
-    (s', g') = assignHelper s Nothing
-    (g1, g2) = split g'
+assignStgAlg (_ :< Apply a b, s) = r ::< Apply (a,(g1,False)) (b,(g2,True)) where
+    (r, [g1,g2]) = assignHelper s 2
 
-assignStgAlg (r :< Lambda i t a, s) = Std Inherit ::< Lambda i t (a,s)
+assignStgAlg (_ :< Lambda i t a, s) = Std Inherit ::< Lambda i t (a,s)
 
-assignStgAlg (r :< Variable id t, s) = fst (assignHelper s (Just id)) ::< Variable id t
+assignStgAlg (_ :< Variable id t, (_,False)) = Std Inherit ::< Variable id t
+assignStgAlg (_ :< Variable id t, s) = Std (Implicit id) ::< Variable id t
 
-assignStgAlg (r :< Map a b, s) = s' ::< Map (a,(g1,False)) (b,(g2,True)) where
-        (s', g') = assignHelper s Nothing
-        (g1, g2) = split g'
+assignStgAlg (_ :< Map a b, s) = r ::< Map (a,(g1,False)) (b,(g2,True)) where
+    (r, [g1,g2]) = assignHelper s 2
 
 assignStgAlg (r :< Reduce a b, s) = mkResult r ::< Reduce (a,(g1,False)) (b,(g2,True)) where
-        (s'@(Std x), g') = assignHelper s Nothing
-        (y, g'') = next g'
-        (g1, g2) = split g''
-        mkResult (snd . getParData -> Just _) = Red (x,Prealloc y)
-        mkResult (snd . getParData -> Nothing) = s'
+    (s'@(Std x), [g',g2]) = assignHelper s 2
+    (y, g1) = next g'
+    mkResult (snd . getParData -> Just _) = Red (x,Prealloc y)
+    mkResult (snd . getParData -> Nothing) = s'
 
-assignStgAlg (r :< ZipWith a b c, s) = s' ::< ZipWith (a,(g1,False)) (b,(g2,True)) (c,(g3,True)) where
-        (s', g') = assignHelper s Nothing
-        (g1, (g2, g3)) = fmap split $ split g'
+assignStgAlg (_ :< ZipWith a b c, s) = r ::< ZipWith (a,(g1,False)) (b,(g2,True)) (c,(g3,True)) where
+    (r, [g1,g2,g3]) = assignHelper s 3
 
-assignHelper :: AssignStgT -> Maybe String -> (Result, StdGen)
-assignHelper (g, False) _ = (Std Inherit, g)
-assignHelper (g, True) id =
-    let (x, g') = next g in
-    case id of 
-        Nothing -> (Std $ Prealloc x, g')
-        Just s  -> (Std $ Implicit s, g')
+assignStgAlg (_ :< Compose a b, (g,_)) = r ::< Compose (a,(g1,False)) (b,(g2,False)) where
+    (r, [g1,g2]) = assignHelper (g,True) 2 
+
+assignHelper :: AssignStgT -> Int -> (Result, [StdGen])
+assignHelper (g, False) n = (Std Inherit, splitN n g)
+assignHelper (g, True)  n = let (x, g') = next g in (Std $ Prealloc x, splitN n g')
+
+splitN :: Int -> StdGen -> [StdGen]
+splitN 1 g = [g]
+splitN n g = let (g1,g2) = split g in g1 : splitN (n-1) g2
 
 assignStorage :: ParData ∈ fields => Cofree ExprF (R fields) -> Cofree ExprF (R (Result ': fields))
 assignStorage e = root $ ana (annotateAna assignStgAlg) (e,(mkStdGen 0, True)) where
@@ -94,6 +94,9 @@ data ResultStg = ResultStg { id :: Int, tnum :: Int, mem :: MemStruct } deriving
 data BigVector = BigVector { id :: String, dataId :: String, mem :: MemStruct } deriving (Eq, Show, Ord)
 type MemStruct = ([Int], [Int])
 
+defaultMem :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => R (fields) -> MemStruct
+defaultMem (countDims . getType -> ds) = (ds, defaultStrides ds)
+
 merge :: Ord a => [a] -> [a] -> [a]
 merge [] y = y
 merge x [] = x
@@ -106,13 +109,19 @@ instance Monoid ResultPack where
     mappend (ResultPack (a, b)) (ResultPack (c, d)) = ResultPack (a ++ c, b ++ d)
     mempty = ResultPack ([], [])
 
-collectStgAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
+-- deriving instance Foldable f => Foldable (Cofree f)
 
-collectStgAlg (r ::< Scalar{}) = getStgAndDims r
+collectStgAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
 
 collectStgAlg ((fieldVal -> Std (Implicit id)) ::< VectorView dataId d s) = ResultPack([], [BigVector id dataId (d,s)])
 
-collectStgAlg (r ::< Vector elements) = getStgAndDims r <> mconcat elements
+-- collectStgAlg (r ::< Vector elements) = getStgAndDims r <> mconcat elements
+
+-- getStgAndDims r <> all children
+
+-- foldmap 
+
+collectStgAlg (r ::< Scalar{}) = getStgAndDims r
 
 collectStgAlg (r ::< Addition a b) = getStgAndDims r <> a <> b
 
@@ -130,10 +139,14 @@ collectStgAlg (r ::< Reduce a b) = getStgAndDims r <> a <> b
 
 collectStgAlg (r ::< ZipWith a b c) = getStgAndDims r <> a <> b <> c
 
+collectStgAlg (r@(snd . getParData -> Just t) ::< Compose a b) = 
+    ResultPack ([ResultStg x t (defaultMem r)],[]) <> a <> b where
+        Prealloc x = getPrimary $ fieldVal r
+collectStgAlg (r ::< Compose a b) = getStgAndDims r <> a <> b
+
 getStgAndDims :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => R (fields) -> ResultPack
 getStgAndDims r = ResultPack (std r ++ temp r, []) where
-    std (getPrimary . fieldVal &&& fst . getParData -> (Prealloc x, t)) = [ResultStg x t (ds, defaultStrides ds)]
+    std (getPrimary . fieldVal &&& fst . getParData -> (Prealloc x, t)) = [ResultStg x t (defaultMem r)]
     std (getPrimary . fieldVal -> _) = []
-    temp (fieldVal &&& snd . getParData -> (Red (_,Prealloc x), Just t)) = [ResultStg x t (ds, defaultStrides ds)]
+    temp (fieldVal &&& snd . getParData -> (Red (_,Prealloc x), Just t)) = [ResultStg x t (defaultMem r)]
     temp _ = []
-    ds = countDims $ getType r

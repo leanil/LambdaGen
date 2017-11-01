@@ -2,6 +2,6 @@ module Fusion where
 
 import Replace
 
-mapFusePat = pMap "m1" (pStar "l1") (pMap "m2" (pStar "m2") (pStar "v"))
+mapFusePat = pMap (pStar "l1") (pMap (pStar "l2") (pStar "v"))
 
--- mapFuseRep = 
+mapFuseRep = pMap (pComp (pStar "l1") (pStar "l2")) (pStar "v")

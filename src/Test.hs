@@ -7,9 +7,11 @@ import Cpp
 import ErrorTest
 import Expr
 import FunctionalTest
+import Fusion
 import Parallel
 import PerformanceTest
 import Recursion
+import Replace
 import Storage
 import Type
 import Typecheck
@@ -28,6 +30,8 @@ process test result =
                 cata (annotate collectStgAlg) $
                 assignStorage $
                 parallelize 4 $
+                cata (annotate typecheckAlg) $
+                replaceAll mapFusePat mapFuseRep $
                 cata constFoldAlg tc
 
     (Right errors) -> print errors

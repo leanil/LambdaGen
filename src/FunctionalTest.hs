@@ -82,7 +82,15 @@ test12 =
             (scl 3))
         a
 
-funcTests = [test1, test2, test3, test6, test7, test8, test9, test10, test11, test12]
+-- {4,6,8}
+test13 = 
+    mkMap
+        (app sclMul (scl 2))
+        (mkMap
+            (lam x (add x (scl 1)))
+            a)
+
+funcTests = [test1, test2, test3, test6, test7, test8, test9, test10, test11, test12, test13]
 
     
 

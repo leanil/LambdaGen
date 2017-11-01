@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, DeriveFunctor, FlexibleInstances, PatternSynonyms, TypeSynonymInstances #-}
+{-# LANGUAGE DataKinds, DeriveFunctor, DeriveFoldable, DeriveTraversable, FlexibleInstances, PatternSynonyms, TypeSynonymInstances #-}
 
 module Expr where
 
@@ -11,9 +11,9 @@ import Data.Vinyl
 data ExprF a
     = Scalar { getValue :: Double }
     | Addition { left :: a, right :: a }
-    | Subtraction { left :: a, right :: a }
+    -- | Subtraction { left :: a, right :: a }
     | Multiplication { left :: a, right :: a }
-    | Division { left :: a, right :: a }
+    -- | Division { left :: a, right :: a }
     | VectorView { id :: String, dms :: [Int], strd :: [Int] }
     | Vector { elements :: [a] }
     | Apply { lambda :: a, value :: a}
@@ -22,21 +22,36 @@ data ExprF a
     | Map { lambda :: a, vector :: a }
     | Reduce { lambda :: a, vector :: a }
     | ZipWith { lambda :: a, vector1 :: a, vector2 :: a }
-    deriving (Functor, Show)
+    | Compose a a
+    deriving (Functor, Foldable, Traversable, Show)
+
+castLeaf :: ExprF a -> ExprF b
+castLeaf = fmap (const undefined)
+
+zipExprF :: (a -> b -> c) -> ExprF a -> [b] -> ExprF c
+zipExprF f (Addition a b) (x:y:_) = Addition (f a x) (f b y)
+zipExprF f (Multiplication a b) (x:y:_) = Multiplication (f a x) (f b y)
+zipExprF f (Apply a b) (x:y:_) = Apply (f a x) (f b y)
+zipExprF f (Lambda a b c) (x:_) = Lambda a b (f c x)
+zipExprF f (Map a b) (x:y:_) = Map (f a x) (f b y)
+zipExprF f (Reduce a b) (x:y:_) = Reduce (f a x) (f b y)
+zipExprF f (ZipWith a b c) (x:y:z:_) = ZipWith (f a x) (f b y) (f c z)
+zipExprF _ a _ = castLeaf a
 
 type Expr fields = Cofree ExprF (HList fields)
 type Expr0 = Expr '[]
 
-pattern FScalar r d               =  (r :< Scalar d)
-pattern FAddition r a b           =  (r :< Addition a b)
-pattern FMultiplication r a b     =  (r :< Multiplication a b)
-pattern FVectorView r id dms strd =  (r :< VectorView id dms strd)
-pattern FApply r lam val          =  (r :< Apply lam val)
-pattern FLambda r id t body       =  (r :< Lambda id t body)
-pattern FVariable r id t          =  (r :< Variable id t)
-pattern FMap r lam v              =  (r :< Map lam v)
-pattern FReduce r lam v           =  (r :< Reduce lam v)
-pattern FZipWith r lam v1 v2      =  (r :< ZipWith lam v1 v2)
+pattern FScalar r d               = (r :< Scalar d)
+pattern FAddition r a b           = (r :< Addition a b)
+pattern FMultiplication r a b     = (r :< Multiplication a b)
+pattern FVectorView r id dms strd = (r :< VectorView id dms strd)
+pattern FApply r lam val          = (r :< Apply lam val)
+pattern FLambda r id t body       = (r :< Lambda id t body)
+pattern FVariable r id t          = (r :< Variable id t)
+pattern FMap r lam v              = (r :< Map lam v)
+pattern FReduce r lam v           = (r :< Reduce lam v)
+pattern FZipWith r lam v1 v2      = (r :< ZipWith lam v1 v2)
+pattern FCompose r a b            = (r :< Compose a b)
 
 wrapExprF :: ExprF Expr0 -> Expr0
 wrapExprF = (RNil :<)
@@ -47,14 +62,14 @@ scl = wrapExprF . Scalar
 add :: Expr0 -> Expr0 -> Expr0
 add x y = wrapExprF $ Addition x y
 
-sub :: Expr0 -> Expr0 -> Expr0
-sub x y = wrapExprF $ Subtraction x y
+-- sub :: Expr0 -> Expr0 -> Expr0
+-- sub x y = wrapExprF $ Subtraction x y
 
 mul :: Expr0 -> Expr0 -> Expr0
 mul x y = wrapExprF $ Multiplication x y
 
-div :: Expr0 -> Expr0 -> Expr0
-div x y = wrapExprF $ Division x y
+-- div :: Expr0 -> Expr0 -> Expr0
+-- div x y = wrapExprF $ Division x y
 
 vecView :: String -> [Int] -> Expr0
 vecView i d = wrapExprF $ VectorView i d (defaultStrides d)
@@ -89,6 +104,9 @@ mkReduce l v = wrapExprF $ Reduce l v
 
 mkZipWith :: Expr0 -> Expr0 -> Expr0 -> Expr0
 mkZipWith l v1 v2 = wrapExprF $ ZipWith l v1 v2
+
+comp :: Expr0 -> Expr0 -> Expr0
+comp a b = wrapExprF $ Compose a b
 
 defaultStrides :: [Int] -> [Int]
 defaultStrides = tail . scanr (*) 1

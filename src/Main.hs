@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, TypeApplications, TypeFamilies #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, ScopedTypeVariables, TypeApplications, TypeFamilies #-}
 
 import CodeGeneration
 import ConstFold
@@ -7,10 +7,12 @@ import Cpp
 import ErrorTest
 import Expr
 import FunctionalTest
+import Fusion
 import Parallel
 import PerformanceTest
 import Print
 import Recursion
+import Replace
 import Storage
 import Type
 import Typecheck
@@ -20,7 +22,7 @@ import Data.List (intercalate)
 import Data.Proxy (Proxy(Proxy))
 import System.IO (print)
 
-test = test1
+test = test13
 
 process expr =
     para (annotatePara codeGenAlg) $
@@ -33,11 +35,16 @@ main = do
     let tcd = cata (annotate typecheckAlg) test
     case fieldVal @TypecheckT $ extract tcd of
         (Left _) -> do
-            -- let prd = process tcd
-            -- writeFile "../test/result.hpp" $ createEvaluator $ extract prd
-            -- putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT, ParData, Result])) prd
-            let var1 = cata constFoldAlg tcd
-            putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) var1
+            let rep = replaceAll mapFusePat mapFuseRep tcd
+            let recheck = cata (annotate typecheckAlg) rep
+            let prd = process recheck
+            writeFile "../test/result.hpp" $ createEvaluator $ extract prd
+            putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT, ParData, Result])) prd
+            --let var1 = cata constFoldAlg tcd
+            --putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) var1
         (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
             printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd
+
+getLeft :: Either a b -> a
+getLeft (Left a) = a

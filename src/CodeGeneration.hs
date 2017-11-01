@@ -69,6 +69,9 @@ codeGenAlg (r ::< Reduce (_,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs))) =
 codeGenAlg (r ::< ZipWith (_,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs)) (rc :< _,CodeGenT (c:cs))) =
     mkPar r (withNL b ++ withNL c) "Zip" (a ++ "," ++ intercalate "," (map getName [rb, rc, r])) (cs ++ bs ++ as)
 
+codeGenAlg (r ::< Compose (_,CodeGenT (a:as)) (_,CodeGenT (b:bs))) = CodeGenT $
+    ("compose(" ++ a ++ "," ++ b ++ "," ++ getName r ++ ")") : as ++ bs
+
 mkPar :: (ParData ∈ fields, ResultPack ∈ fields) => R fields -> String -> String -> String -> [String] -> CodeGenT
 mkPar r@(snd . getParData -> Just t) vec hof body groups =
     CodeGenT $ "" : (if hof == "Reduce" then [mkCommandGroup r ("ParReduceJoin(" ++ body ++ "," ++ show t ++ ");")] else []) ++
