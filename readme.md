@@ -1,7 +1,21 @@
-# LambdaGen
-## Usage
-Build the expression you'd like to evaluate from the primitives described later. Provide the necessary data as named pointers in your cpp file. You can use the Input.hs and main.cpp templates in eval, and try the whole workflow with run.hs.
-## Expression primitives
+LambdaGen
+==========
+This tool supports automatic optimization and parallel evaluation of linear algebraic computations on GPUs. It's primary purpose is to let scientists focus on science while providing them with reasonable utilization of the available massively parallel architecture. 
+# Usage
+ - You build the expression tree of your calculation using high level
+   primitives known from functional programming (lambda expressions,
+   higher order functions, etc.).
+ - We analyze and transform the expression tree to make it more suitable for GPU evaluation, and
+ - determine how to allocate threads and memory to effectively utilize
+   your hardware.
+ - Finally we produce SYCL code, which you just need to compile&run to get the result of your calculation.
+# Examples
+There is a very basic but complete example in [eval](https://github.com/leanil/LambdaGen/tree/master/eval). You can also find more complex expression trees in [FunctionalTest.hs](https://github.com/leanil/LambdaGen/blob/master/src/FunctionalTest.hs), and the generated SYCL codes in [test](https://github.com/leanil/LambdaGen/tree/master/test).
+
+# Pre-requisites
+ - [ComputeCpp](https://www.codeplay.com/products/computesuite/computecpp) OR
+ - [triSYCL](https://github.com/triSYCL/triSYCL)
+# Expression primitives
 **scl x**: Scalar constant with value x. Its type is `double`.  
 **add a b**, **mul a b**: Scalar addition and multiplication. The type of a, b and the result is `double`.  
 **vecView id [d<sub>1</sub>,...,d<sub>n</sub>]**: A tensor of size d<sub>1</sub> x … x d<sub>n</sub> referencing used data id.  
