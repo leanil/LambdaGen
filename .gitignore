@@ -1,7 +1,3 @@
-test/Debug/
-test/Release/
-test/x64/
-test/.vs/
-test/eval
-test/out.txt
-test/test.vcxproj.user
+.stack-work/
+LambdaGen.cabal
+*~

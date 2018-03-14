@@ -38,7 +38,7 @@ main = do
             let rep = replaceAll mapFusePat mapFuseRep tcd
             let recheck = cata (annotate typecheckAlg) rep
             let prd = process recheck
-            writeFile "../test/result.hpp" $ createEvaluator $ extract prd
+            writeFile "../../result.hpp" $ createEvaluator $ extract prd
             putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT, ParData, Result])) prd
             --let var1 = cata constFoldAlg tcd
             --putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) var1
