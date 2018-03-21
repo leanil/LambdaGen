@@ -9,8 +9,8 @@ import Storage
 import Data.Vinyl
 import Data.List (intercalate)
 
-createEvaluator :: (CodeGenT ∈ fields, Result ∈ fields, ResultPack ∈ fields, ParData ∈ fields) => R fields -> String
-createEvaluator expr =
+createEvaluator :: (CodeGenT ∈ fields, Result ∈ fields, ResultPack ∈ fields, ParData ∈ fields) => String -> R fields -> String
+createEvaluator evaluatorName expr =
     concatMap (\h -> "#include " ++ h ++ "\n") headers ++
     "\n" ++ signature ++ "{\n" ++
     "\t" ++ fst returnType ++ " result(" ++ snd returnType ++ ", new double[" ++ sMemSize (getMemStruct resPack) ++ "]);\n" ++
@@ -22,7 +22,7 @@ createEvaluator expr =
         headers = ["\"helper.h\"", "\"my_sycl.h\"", "\"View.h\"", "<map>", "<string>"]
         resPack = fieldVal expr
         returnType = getReturnType resPack
-        signature = fst returnType ++ " evaluator(std::map<std::string, double*> bigVectors)"
+        signature = fst returnType ++ " " ++ evaluatorName ++ "(std::map<std::string, double*> bigVectors)"
         getMemStruct (ResultPack (ResultStg _ _ mem : _,_)) = mem
 
 getReturnType :: ResultPack -> (String,String)

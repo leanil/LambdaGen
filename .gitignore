@@ -1,3 +1,5 @@
+test/build
+
 .stack-work/
 LambdaGen.cabal
 *~

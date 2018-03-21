@@ -22,7 +22,8 @@ import Data.List (intercalate)
 import Data.Proxy (Proxy(Proxy))
 import System.IO (print)
 
-test = test13
+test :: Expr0
+test = fst test11
 
 process expr =
     para (annotatePara codeGenAlg) $
@@ -31,6 +32,7 @@ process expr =
     parallelize 4 $
     cata constFoldAlg expr
 
+main :: IO ()
 main = do
     let tcd = cata (annotate typecheckAlg) test
     case fieldVal @TypecheckT $ extract tcd of
@@ -38,7 +40,7 @@ main = do
             let rep = replaceAll mapFusePat mapFuseRep tcd
             let recheck = cata (annotate typecheckAlg) rep
             let prd = process recheck
-            writeFile "../../result.hpp" $ createEvaluator $ extract prd
+            writeFile "../../result.hpp" $ createEvaluator "evaluator" $ extract prd
             putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT, ParData, Result])) prd
             --let var1 = cata constFoldAlg tcd
             --putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) var1

@@ -11,9 +11,7 @@ import Data.Vinyl
 data ExprF a
     = Scalar { getValue :: Double }
     | Addition { left :: a, right :: a }
-    -- | Subtraction { left :: a, right :: a }
     | Multiplication { left :: a, right :: a }
-    -- | Division { left :: a, right :: a }
     | VectorView { id :: String, dms :: [Int], strd :: [Int] }
     | Vector { elements :: [a] }
     | Apply { lambda :: a, value :: a}
@@ -22,6 +20,7 @@ data ExprF a
     | Map { lambda :: a, vector :: a }
     | Reduce { lambda :: a, vector :: a }
     | ZipWith { lambda :: a, vector1 :: a, vector2 :: a }
+    -- | NZipWith { lambda :: a, vector1 :: a, vector2 :: a }
     | Compose a a
     deriving (Functor, Foldable, Traversable, Show)
 
@@ -62,14 +61,8 @@ scl = wrapExprF . Scalar
 add :: Expr0 -> Expr0 -> Expr0
 add x y = wrapExprF $ Addition x y
 
--- sub :: Expr0 -> Expr0 -> Expr0
--- sub x y = wrapExprF $ Subtraction x y
-
 mul :: Expr0 -> Expr0 -> Expr0
 mul x y = wrapExprF $ Multiplication x y
-
--- div :: Expr0 -> Expr0 -> Expr0
--- div x y = wrapExprF $ Division x y
 
 vecView :: String -> [Int] -> Expr0
 vecView i d = wrapExprF $ VectorView i d (defaultStrides d)

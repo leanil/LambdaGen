@@ -25,8 +25,11 @@ dependencies:
 - containers
 - either
 - free
+- neat-interpolation
+- process
 - random
 - recursion-schemes
+- text
 - vinyl
 
 library:
@@ -45,7 +48,7 @@ executables:
 
 tests:
   LambdaGen-test:
-    main:                Spec.hs
+    main:                Test.hs
     source-dirs:         test
     ghc-options:
     - -threaded
