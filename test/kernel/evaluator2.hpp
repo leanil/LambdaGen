@@ -12,9 +12,9 @@ View<double*,double> evaluator2(std::map<std::string, double*> bigVectors){
 		act_cgh = &cgh;
 		View<accessor,double> v_2147482884(std::array<size_t,0>{},b_2147482884.get_access<rw_access>(cgh));
 		act_cgh->single_task<class SingleKernel>([=] () mutable {
-			[=](double x){return
-			[=](double y){return
-			[=](View<accessor,double> result){
+			[=](auto x){return
+			[=](auto y){return
+			[=](auto result){return
 			result=x+y;};};}(5.0)(12.0)(v_2147482884);
 		});
 	});

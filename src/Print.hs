@@ -6,7 +6,7 @@ import Expr
 import Recursion
 import Control.Comonad.Cofree (Cofree(..))
 import Data.Functor.Foldable (ana, cata)
-import Data.Proxy (Proxy(Proxy))
+import Data.Proxy (Proxy)
 import Data.Vinyl
 import Data.Vinyl.Functor (Identity(..))
 import Data.Vinyl.TypeLevel (RecAll)
@@ -30,19 +30,19 @@ printerAlg :: forall fields select . (IndentT ∈ fields, select ⊆ fields, Rec
 
 printerAlg _ (r ::< Scalar x) = mkTabs r ++ "Scalar " ++ show x ++ ": " ++ show (rcast r :: R select) ++ "\n"
 
-printerAlg _ (r ::< Vector elements) = mkTabs r ++ "Vector: " ++ show (rcast r :: R select) ++ "\n" ++ concat elements
+printerAlg _ (r ::< Vector e) = mkTabs r ++ "Vector: " ++ show (rcast r :: R select) ++ "\n" ++ concat e
 
-printerAlg _ (r ::< VectorView id _ _) = mkTabs r ++ "VectorView " ++ id ++ ": " ++ show (rcast r :: R select) ++ "\n"
+printerAlg _ (r ::< VectorView i _ _) = mkTabs r ++ "VectorView " ++ i ++ ": " ++ show (rcast r :: R select) ++ "\n"
 
 printerAlg _ (r ::< Addition a b) = mkTabs r ++ "Addition: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
 
 printerAlg _ (r ::< Multiplication a b) = mkTabs r ++ "Multiplication: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
 
-printerAlg _ (r ::< Apply a b) = mkTabs r ++ "Apply: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
+printerAlg _ (r ::< Apply a b) = mkTabs r ++ "Apply: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ concat b
 
-printerAlg _ (r ::< Lambda id _ a) = mkTabs r ++ "Lambda " ++ id ++ ": " ++ show (rcast r :: R select) ++ "\n" ++ a
+printerAlg _ (r ::< Lambda v a) = mkTabs r ++ "Lambda" ++ (concatMap ((' ':) . fst) v) ++ ": " ++ show (rcast r :: R select) ++ "\n" ++ a
 
-printerAlg _ (r ::< Variable id _) = mkTabs r ++ "Variable " ++ id ++ ": " ++ show (rcast r :: R select) ++ "\n"
+printerAlg _ (r ::< Variable i _) = mkTabs r ++ "Variable " ++ i ++ ": " ++ show (rcast r :: R select) ++ "\n"
 
 printerAlg _ (r ::< Map a b) = mkTabs r ++ "Map: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
 

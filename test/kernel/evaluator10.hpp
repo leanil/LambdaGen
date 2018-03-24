@@ -13,9 +13,9 @@ View<double*,double,3> evaluator10(std::map<std::string, double*> bigVectors){
 		act_cgh = &cgh;
 		View<accessor,double,3> a1838073155(std::array<size_t,1>{1},b_a1838073155.get_access<rw_access>(cgh));
 		View<accessor,double,3> v_2147482884(std::array<size_t,1>{1},b_2147482884.get_access<rw_access>(cgh));
-		ParMap([=](double x){return
-		[=](double y){return
-		[=](View<accessor,double> result, unsigned thread_id){
+		ParMap([=](auto x){return
+		[=](auto y){return
+		[=](auto result, unsigned thread_id){return
 		result=x;};};}(3.0),a1838073155,v_2147482884,4);
 	});
 	return result;

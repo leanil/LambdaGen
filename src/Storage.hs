@@ -9,7 +9,7 @@ import Type
 import Typecheck
 import Control.Arrow
 import Control.Comonad.Cofree (Cofree(..))
-import Data.List (intercalate, unfoldr)
+import Data.List (intercalate)
 import Data.Monoid
 import Data.Vinyl
 import Data.Vinyl.Functor (Identity(..))
@@ -30,25 +30,25 @@ assignStgAlg :: ParData ∈ fields => CoAlgebra (Cofree ExprF Result) ((Cofree E
 assignStgAlg (_ :< a@Scalar{}, (_,False)) = Std Inherit ::< castLeaf a
 assignStgAlg (_ :< Scalar x, _) = Std (Implicit $ show x) ::< Scalar x
 
-assignStgAlg (_ :< VectorView id a b, (g, True)) = Std (Implicit viewName) ::< VectorView id a b where
-    viewName = id ++ show (fst $ next g)
+assignStgAlg (_ :< VectorView i a b, (g, True)) = Std (Implicit viewName) ::< VectorView i a b where
+    viewName = i ++ show (fst $ next g)
 
 -- assignStgAlg (r :< Vector elements, s) = s' ::< (Vector $ zip elements (map (,True) $ unfoldr (Just .split) g'))where
 --     (s', g') = assignHelper s Nothing
 
-assignStgAlg (_ :< Addition a b, s) = r ::< Addition (a,(g1,True)) (b,(g2,True)) where
-    (r, [g1,g2]) = assignHelper s 2
+assignStgAlg (_ :< n@Addition{}, s) = r ::< zipExprF (,) n (zip g [True, True]) where
+    (r, g) = assignHelper s 2
 
 assignStgAlg (_ :< Multiplication a b, s) = r ::< Multiplication (a,(g1,True)) (b,(g2,True)) where
     (r, [g1,g2]) = assignHelper s 2
 
-assignStgAlg (_ :< Apply a b, s) = r ::< Apply (a,(g1,False)) (b,(g2,True)) where
-    (r, [g1,g2]) = assignHelper s 2
+assignStgAlg (_ :< n@(Apply _ b), s) = r ::< zipExprF (,) n (zip g (False:repeat True)) where
+    (r, g) = assignHelper s (length b + 1)
 
-assignStgAlg (_ :< Lambda i t a, s) = Std Inherit ::< Lambda i t (a,s)
+assignStgAlg (_ :< Lambda v a, s) = Std Inherit ::< Lambda v (a,s)
 
-assignStgAlg (_ :< Variable id t, (_,False)) = Std Inherit ::< Variable id t
-assignStgAlg (_ :< Variable id t, s) = Std (Implicit id) ::< Variable id t
+assignStgAlg (_ :< Variable i t, (_,False)) = Std Inherit ::< Variable i t
+assignStgAlg (_ :< Variable i t, _) = Std (Implicit i) ::< Variable i t
 
 assignStgAlg (_ :< Map a b, s) = r ::< Map (a,(g1,False)) (b,(g2,True)) where
     (r, [g1,g2]) = assignHelper s 2
@@ -84,14 +84,14 @@ dims d tn = "," ++ show tn ++ dims d 1
 
 strides :: MemStruct -> Int -> String
 strides (_,s) 1 = "std::array<size_t," ++ show (length s) ++ ">{" ++ intercalate "," (map show s) ++ "}"
-strides (d,s) tn = strides (d,product d : s) 1
+strides (d,s) _ = strides (d,product d : s) 1
 
 viewType :: MemStruct -> Int -> String -> (String,String)
-viewType mem@(d,_) tn ptrType = ("View<" ++ ptrType ++ ",double" ++ dims d tn ++ ">", strides mem tn)
+viewType m@(d,_) tn ptrType = ("View<" ++ ptrType ++ ",double" ++ dims d tn ++ ">", strides m tn)
 
 newtype ResultPack = ResultPack ([ResultStg], [BigVector]) deriving Show -- collect vecView dimensions to allocate buffers for user data
-data ResultStg = ResultStg { id :: Int, tnum :: Int, mem :: MemStruct } deriving (Eq, Show, Ord)
-data BigVector = BigVector { id :: String, dataId :: String, mem :: MemStruct } deriving (Eq, Show, Ord)
+data ResultStg = ResultStg { id :: Int, tnum :: Int, getMem :: MemStruct } deriving (Eq, Show, Ord)
+data BigVector = BigVector { id :: String, dataId :: String, getMem :: MemStruct } deriving (Eq, Show, Ord)
 type MemStruct = ([Int], [Int])
 
 defaultMem :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => R (fields) -> MemStruct
@@ -113,7 +113,7 @@ instance Monoid ResultPack where
 
 collectStgAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
 
-collectStgAlg ((fieldVal -> Std (Implicit id)) ::< VectorView dataId d s) = ResultPack([], [BigVector id dataId (d,s)])
+collectStgAlg ((fieldVal -> Std (Implicit i)) ::< VectorView di d s) = ResultPack([], [BigVector i di (d,s)])
 
 -- collectStgAlg (r ::< Vector elements) = getStgAndDims r <> mconcat elements
 
@@ -127,9 +127,9 @@ collectStgAlg (r ::< Addition a b) = getStgAndDims r <> a <> b
 
 collectStgAlg (r ::< Multiplication a b) = getStgAndDims r <>  a <> b
 
-collectStgAlg (r ::< Apply a b) = getStgAndDims r <> a <> b
+collectStgAlg (r ::< Apply a b) = getStgAndDims r <> a <> mconcat b
 
-collectStgAlg (r ::< Lambda _ _ a) = getStgAndDims r <> a
+collectStgAlg (r ::< Lambda _ a) = getStgAndDims r <> a
 
 collectStgAlg (r ::< Variable{}) = getStgAndDims r
 

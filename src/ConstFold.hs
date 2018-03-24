@@ -9,15 +9,15 @@ constFoldAlg :: Algebra (Cofree ExprF a) (Cofree ExprF a)
 
 constFoldAlg (r ::< Addition (_ :< Scalar a) (_ :< Scalar b)) = r :< Scalar (a+b)
 
-constFoldAlg (r ::< Addition (_ :< Scalar 0) a) = a
+constFoldAlg (_ ::< Addition (_ :< Scalar 0) a) = a
 
-constFoldAlg (r ::< Addition a (_ :< Scalar 0)) = a
+constFoldAlg (_ ::< Addition a (_ :< Scalar 0)) = a
 
 constFoldAlg (r ::< Multiplication (_ :< Scalar a) (_ :< Scalar b)) = r :< Scalar (a*b)
 
-constFoldAlg (r ::< Multiplication (_ :< Scalar 1) a) = a
+constFoldAlg (_ ::< Multiplication (_ :< Scalar 1) a) = a
 
-constFoldAlg (r ::< Multiplication a (_ :< Scalar 1)) = a
+constFoldAlg (_ ::< Multiplication a (_ :< Scalar 1)) = a
 
 constFoldAlg (r ::< Multiplication (_ :< Scalar 0) _) = r :< Scalar 0
 

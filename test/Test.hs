@@ -15,36 +15,34 @@ import Control.Comonad (extract)
 import Control.Monad (foldM)
 import Data.Functor.Foldable (cata, para)
 import Data.Text (Text, concat, pack, unpack)
+import Data.Validation (Validation(..))
 import NeatInterpolation
 import Prelude hiding (concat)
 import System.Exit (ExitCode(..), exitFailure)
 import System.IO (print)
 import System.Process (cwd, createProcess, proc, waitForProcess)
-import Text.Printf (printf)
 
 process :: Expr0 -> String -> IO ()
 process test evalId =
     let tc = cata (annotate typecheckAlg) test in
     case fieldVal @TypecheckT $ extract tc of
-    (Left _) -> writeFile ("test/kernel/" ++ evalId ++ ".hpp") $
+    (Success _) -> writeFile ("test/kernel/" ++ evalId ++ ".hpp") $
                 createEvaluator evalId $ extract $
                 para (annotatePara codeGenAlg) $
                 cata (annotate collectStgAlg) $
                 assignStorage $
                 parallelize 4 $
-                cata (annotate typecheckAlg) $
-                replaceAll mapFusePat mapFuseRep $
                 cata constFoldAlg tc
 
-    (Right errors) -> print errors
+    (Failure errors) -> print errors
 
 evalIds :: [String]
 evalIds = (map (("evaluator"++) . show) [1..(length funcTests)])
 
 createProcessAndExitOnFailure :: String -> [String] -> IO ()
 createProcessAndExitOnFailure processName args = do
-    (_, _, _, proc) <- createProcess (proc processName args){ cwd = Just "test/build" }
-    code <- waitForProcess proc
+    (_, _, _, handle) <- createProcess (proc processName args){ cwd = Just "test/build" }
+    code <- waitForProcess handle
     case code of
         ExitSuccess -> return ()
         _           -> exitFailure
@@ -60,9 +58,9 @@ main = do
     createProcessAndExitOnFailure "ctest" []
 
 testCode :: Text -> Text -> Text
-testCode include switch =
+testCode includeText switchText =
     [text|
-        $include
+        $includeText
         #include "tester.hpp"
         #include <cstdlib>
 
@@ -76,7 +74,7 @@ testCode include switch =
                 { "tens", gen_seq(1,24) }
             };
             switch (atoi(argv[1])) {
-            $switch
+            $switchText
             }
         }
     |]
