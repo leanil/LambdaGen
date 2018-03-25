@@ -5,10 +5,8 @@ import ConstFold
 import Cpp
 import Expr
 import FunctionalTest
-import Fusion
 import Parallel
 import Recursion
-import Replace
 import Storage
 import Typecheck
 import Control.Comonad (extract)
@@ -26,7 +24,7 @@ process :: Expr0 -> String -> IO ()
 process test evalId =
     let tc = cata (annotate typecheckAlg) test in
     case fieldVal @TypecheckT $ extract tc of
-    (Success _) -> writeFile ("test/kernel/" ++ evalId ++ ".hpp") $
+    (Left _) -> writeFile ("test/kernel/" ++ evalId ++ ".hpp") $
                 createEvaluator evalId $ extract $
                 para (annotatePara codeGenAlg) $
                 cata (annotate collectStgAlg) $
@@ -34,7 +32,7 @@ process test evalId =
                 parallelize 4 $
                 cata constFoldAlg tc
 
-    (Failure errors) -> print errors
+    (Right errors) -> print errors
 
 evalIds :: [String]
 evalIds = (map (("evaluator"++) . show) [1..(length funcTests)])

@@ -90,8 +90,8 @@ viewType :: MemStruct -> Int -> String -> (String,String)
 viewType m@(d,_) tn ptrType = ("View<" ++ ptrType ++ ",double" ++ dims d tn ++ ">", strides m tn)
 
 newtype ResultPack = ResultPack ([ResultStg], [BigVector]) deriving Show -- collect vecView dimensions to allocate buffers for user data
-data ResultStg = ResultStg { id :: Int, tnum :: Int, getMem :: MemStruct } deriving (Eq, Show, Ord)
-data BigVector = BigVector { id :: String, dataId :: String, getMem :: MemStruct } deriving (Eq, Show, Ord)
+data ResultStg = ResultStg { name :: Int, tnum :: Int, getMem :: MemStruct } deriving (Eq, Show, Ord)
+data BigVector = BigVector { name :: String, dataId :: String, getMem :: MemStruct } deriving (Eq, Show, Ord)
 type MemStruct = ([Int], [Int])
 
 defaultMem :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => R (fields) -> MemStruct

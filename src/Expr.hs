@@ -14,6 +14,7 @@ data ExprF a
     | VectorView { name :: String, dms :: [Int], strd :: [Int] }
     | Vector { elements :: [a] }
     | Apply { lambda :: a, values :: [a]}
+    | Let { name :: String, value :: a, inExpr :: a }
     | Lambda { vars :: [(String,Type)], getBody :: a }
     | Variable { name :: String, tp :: Type }
     | Map { lambda :: a, vector :: a }

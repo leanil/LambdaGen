@@ -14,7 +14,6 @@ import Control.Comonad (extract)
 import Data.Functor.Foldable (cata, para)
 import Data.List (intercalate)
 import Data.Proxy (Proxy(Proxy))
-import Data.Validation (Validation(..))
 import Data.Vinyl
 
 test :: Expr0
@@ -32,13 +31,13 @@ main :: IO ()
 main = do
     let tcd = cata (annotate typecheckAlg) test
     case fieldVal @TypecheckT $ extract tcd of
-        (Success _) -> do
+        (Left _) -> do
             let prd = process tcd
             writeFile "../../result.hpp" $ createEvaluator "evaluator" $ extract prd
             putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT, ParData, Result])) prd
             --let var1 = cata constFoldAlg tcd
             --putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) var1
-        (Failure errors) ->
+        (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
             printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd
 
