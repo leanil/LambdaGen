@@ -40,6 +40,8 @@ printerAlg _ (r ::< Multiplication a b) = mkTabs r ++ "Multiplication: " ++ show
 
 printerAlg _ (r ::< Apply a b) = mkTabs r ++ "Apply: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ concat b
 
+printerAlg _ (r ::< Let n a b) = mkTabs r ++ "Let " ++ n ++ ": " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
+
 printerAlg _ (r ::< Lambda v a) = mkTabs r ++ "Lambda" ++ (concatMap ((' ':) . fst) v) ++ ": " ++ show (rcast r :: R select) ++ "\n" ++ a
 
 printerAlg _ (r ::< Variable i _) = mkTabs r ++ "Variable " ++ i ++ ": " ++ show (rcast r :: R select) ++ "\n"

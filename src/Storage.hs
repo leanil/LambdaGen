@@ -13,6 +13,7 @@ import Data.List (intercalate)
 import Data.Monoid
 import Data.Vinyl
 import Data.Vinyl.Functor (Identity(..))
+import Data.Foldable (fold)
 import Data.Functor.Foldable (ana)
 import System.Random
 
@@ -44,6 +45,9 @@ assignStgAlg (_ :< Multiplication a b, s) = r ::< Multiplication (a,(g1,True)) (
 
 assignStgAlg (_ :< n@(Apply _ b), s) = r ::< zipExprF (,) n (zip g (False:repeat True)) where
     (r, g) = assignHelper s (length b + 1)
+
+assignStgAlg (_ :< Let n v e, s) = r ::< Let n (v,(g1,True)) (e,(g2,False)) where
+    (r, [g1,g2]) = assignHelper s 2
 
 assignStgAlg (_ :< Lambda v a, s) = Std Inherit ::< Lambda v (a,s)
 
@@ -109,35 +113,11 @@ instance Monoid ResultPack where
     mappend (ResultPack (a, b)) (ResultPack (c, d)) = ResultPack (a ++ c, b ++ d)
     mempty = ResultPack ([], [])
 
--- deriving instance Foldable f => Foldable (Cofree f)
-
 collectStgAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
 
 collectStgAlg ((fieldVal -> Std (Implicit i)) ::< VectorView di d s) = ResultPack([], [BigVector i di (d,s)])
 
--- collectStgAlg (r ::< Vector elements) = getStgAndDims r <> mconcat elements
-
--- getStgAndDims r <> all children
-
--- foldmap 
-
-collectStgAlg (r ::< Scalar{}) = getStgAndDims r
-
-collectStgAlg (r ::< Addition a b) = getStgAndDims r <> a <> b
-
-collectStgAlg (r ::< Multiplication a b) = getStgAndDims r <>  a <> b
-
-collectStgAlg (r ::< Apply a b) = getStgAndDims r <> a <> mconcat b
-
-collectStgAlg (r ::< Lambda _ a) = getStgAndDims r <> a
-
-collectStgAlg (r ::< Variable{}) = getStgAndDims r
-
-collectStgAlg (r ::< Map a b) = getStgAndDims r <> a <> b
-    
-collectStgAlg (r ::< Reduce a b) = getStgAndDims r <> a <> b
-
-collectStgAlg (r ::< ZipWith a b c) = getStgAndDims r <> a <> b <> c
+collectStgAlg (r ::< node) = getStgAndDims r <> fold node
 
 collectStgAlg (r@(snd . getParData -> Just t) ::< Compose a b) = 
     ResultPack ([ResultStg x t (defaultMem r)],[]) <> a <> b where

@@ -13,7 +13,6 @@ import Control.Comonad (extract)
 import Control.Monad (foldM)
 import Data.Functor.Foldable (cata, para)
 import Data.Text (Text, concat, pack, unpack)
-import Data.Validation (Validation(..))
 import NeatInterpolation
 import Prelude hiding (concat)
 import System.Exit (ExitCode(..), exitFailure)

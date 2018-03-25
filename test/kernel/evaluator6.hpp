@@ -18,15 +18,15 @@ View<double*,double,3,3> evaluator6(std::map<std::string, double*> bigVectors){
 		act_cgh->single_task<class SingleKernel>([=] () mutable {
 			[=](auto v1){return
 			[=](auto v2){return
-			[=](auto result){return
+			[=](auto result){
 			Map([=](auto x){return
-			[=](auto result){return
+			[=](auto result){
 			[=](auto x){return
 			[=](auto v){return
-			[=](auto result){return
+			[=](auto result){
 			Map([=](auto x){return
 			[=](auto y){return
-			[=](auto result){return
+			[=](auto result){
 			result=x*y;};};}(x),v,result);};};}(x)(v2)(result);};},v1,result);};};}(a898856380)(b931609811)(v_2147482884);
 		});
 	});

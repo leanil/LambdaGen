@@ -23,9 +23,6 @@ codeGenAlg (r ::< Scalar s) = mkRoot r (getName r ++ "=" ++ show s) "" []
 
 codeGenAlg (_ ::< VectorView{}) = CodeGenT [""]
 
--- codeGenAlg (r ::< Vector e) = let (strs, bools) = unzip $ snd $ unzip e in
---     ("make_vector({" ++ intercalate "," strs ++ "})", or bools)
-
 codeGenAlg (r ::< Addition (ra :< _,CodeGenT (a:as)) (rb :< _,CodeGenT (b:bs))) =
     mkRoot r code code (bs ++ as) where
         code = withNL a ++ withNL b ++ getName r ++ "=" ++ getName ra ++ "+" ++ getName rb
@@ -41,10 +38,14 @@ codeGenAlg (r ::< Apply (_,CodeGenT (a:as)) v) =
         decorate (getType -> Fix Arrow{}) s = s
         decorate _                        s = s ++ "(" ++ getName r ++ ")"
 
+codeGenAlg (r ::< Let n (ra :< _,CodeGenT (a:as)) (_ :< _,CodeGenT (b:bs))) =
+    mkRoot r code code (bs ++ as) where
+        code = withNL a ++ "auto " ++ n ++ "=" ++ getName ra ++ ";\n" ++ b
+
 codeGenAlg (r ::< Lambda v (_,CodeGenT (a:as))) =
      CodeGenT $ mkLambda v : as where
         mkLambda ((n,_):xs) = "[=](auto " ++ n ++ "){return\n" ++ mkLambda xs ++ ";}"
-        mkLambda [] = "[=](auto result" ++ threadId r ++ "){return\n" ++ a ++ ";}"
+        mkLambda [] = "[=](auto result" ++ threadId r ++ "){\n" ++ a ++ ";}"
         threadId (snd . getParData -> Just x)
             | x == 1 = ""
             | x > 1  = ", unsigned thread_id"

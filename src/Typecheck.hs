@@ -37,8 +37,7 @@ typecheckAlg (_ ::< Apply (Left (FArrow a b)) (allLeft -> (True, c)))
     | otherwise = Right $ catMaybes (zipWith eqCheck a c)       
 typecheckAlg (_ ::< Apply (Left a) _) = Right $ [showT a ++ " not a lambda"]
 
--- typecheckAlg (_ ::< Let _ v e) = unwrap $ letCheck <$> v <$> e where
---     letCheck _ y = Left $ y
+typecheckAlg (_ ::< Let _ (Left _) (Left e)) = Left e
 
 typecheckAlg (_ ::< Lambda v (Left b)) = Left $ arrow (map snd v) b
         

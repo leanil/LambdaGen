@@ -15,7 +15,7 @@ View<double*,double,3> evaluator11(std::map<std::string, double*> bigVectors){
 		View<accessor,double,3> a284719151(std::array<size_t,1>{1},b_a284719151.get_access<rw_access>(cgh));
 		View<accessor,double,3> v_1838073155(std::array<size_t,1>{1},b_1838073155.get_access<rw_access>(cgh));
 		ParMap([=](auto x){return
-		[=](auto result, unsigned thread_id){return
+		[=](auto result, unsigned thread_id){
 		result=x+1.0;};},a284719151,v_1838073155,4);
 	});
 	deviceQueue.submit([&] (cl::sycl::handler &cgh) {
@@ -25,7 +25,7 @@ View<double*,double,3> evaluator11(std::map<std::string, double*> bigVectors){
 		View<accessor,double,3> v_1838073155(std::array<size_t,1>{1},b_1838073155.get_access<rw_access>(cgh));
 		ParMap([=](auto x){return
 		[=](auto y){return
-		[=](auto result, unsigned thread_id){return
+		[=](auto result, unsigned thread_id){
 		result=x*y;};};}(2.0),v_1838073155,v_2147482884,4);
 	});
 	return result;

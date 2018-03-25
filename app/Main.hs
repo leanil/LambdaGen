@@ -17,7 +17,7 @@ import Data.Proxy (Proxy(Proxy))
 import Data.Vinyl
 
 test :: Expr0
-test = fst test11
+test = fst test4
 
 process :: TypecheckT ∈ fields => Expr fields -> Expr (CodeGenT ': ResultPack ': Result ': ParData ': fields)
 process expr =
@@ -33,7 +33,7 @@ main = do
     case fieldVal @TypecheckT $ extract tcd of
         (Left _) -> do
             let prd = process tcd
-            writeFile "../../result.hpp" $ createEvaluator "evaluator" $ extract prd
+            writeFile "../result.hpp" $ createEvaluator "evaluator" $ extract prd
             putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT, ParData, Result])) prd
             --let var1 = cata constFoldAlg tcd
             --putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) var1

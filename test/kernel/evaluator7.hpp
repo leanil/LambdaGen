@@ -20,19 +20,19 @@ View<double*,double,2,2> evaluator7(std::map<std::string, double*> bigVectors){
 		act_cgh->single_task<class SingleKernel>([=] () mutable {
 			[=](auto m1){return
 			[=](auto m2){return
-			[=](auto result){return
+			[=](auto result){
 			Map([=](auto v){return
-			[=](auto result){return
+			[=](auto result){
 			Map([=](auto v1){return
 			[=](auto v2){return
-			[=](auto result){return
+			[=](auto result){
 			Zip([=](auto x){return
 			[=](auto y){return
-			[=](auto result){return
+			[=](auto result){
 			result=x*y;};};},v1,v2,v_1675647699),
 			Reduce([=](auto x){return
 			[=](auto y){return
-			[=](auto result){return
+			[=](auto result){
 			result=x+y;};};},v_1675647699,result);};};}(v),m2,result);};},m1,result);};};}(mat898856380)(mat931609811)(v_2147482884);
 		});
 	});

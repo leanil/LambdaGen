@@ -15,7 +15,7 @@ View<double*,double,3> evaluator10(std::map<std::string, double*> bigVectors){
 		View<accessor,double,3> v_2147482884(std::array<size_t,1>{1},b_2147482884.get_access<rw_access>(cgh));
 		ParMap([=](auto x){return
 		[=](auto y){return
-		[=](auto result, unsigned thread_id){return
+		[=](auto result, unsigned thread_id){
 		result=x;};};}(3.0),a1838073155,v_2147482884,4);
 	});
 	return result;

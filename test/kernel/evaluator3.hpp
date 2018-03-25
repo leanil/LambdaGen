@@ -14,7 +14,7 @@ View<double*,double> evaluator3(std::map<std::string, double*> bigVectors){
 		View<accessor,double> v_1838073155(std::array<size_t,0>{},b_1838073155.get_access<rw_access>(cgh));
 		act_cgh->single_task<class SingleKernel>([=] () mutable {
 			[=](auto x){return
-			[=](auto result){return
+			[=](auto result){
 			result=x+x;};}(2.0)(v_1838073155);
 		});
 	});
@@ -24,7 +24,7 @@ View<double*,double> evaluator3(std::map<std::string, double*> bigVectors){
 		View<accessor,double> v_1838073155(std::array<size_t,0>{},b_1838073155.get_access<rw_access>(cgh));
 		act_cgh->single_task<class SingleKernel>([=] () mutable {
 			[=](auto y){return
-			[=](auto result){return
+			[=](auto result){
 			result=y*y;};}(v_1838073155)(v_2147482884);
 		});
 	});

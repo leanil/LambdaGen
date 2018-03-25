@@ -31,6 +31,7 @@ zipExprF :: (a -> b -> c) -> ExprF a -> [b] -> ExprF c
 zipExprF f (Addition a b) (x:y:_) = Addition (f a x) (f b y)
 zipExprF f (Multiplication a b) (x:y:_) = Multiplication (f a x) (f b y)
 zipExprF f (Apply a b) (x:xs) = Apply (f a x) $ zipWith f b xs
+zipExprF f (Let n a b) (x:y:_) = Let n (f a x) (f b y)
 zipExprF f (Lambda a b) (x:_) = Lambda a (f b x)
 zipExprF f (Map a b) (x:y:_) = Map (f a x) (f b y)
 zipExprF f (Reduce a b) (x:y:_) = Reduce (f a x) (f b y)
@@ -44,7 +45,8 @@ pattern FScalar r d               = (r :< Scalar d)
 pattern FAddition r a b           = (r :< Addition a b)
 pattern FMultiplication r a b     = (r :< Multiplication a b)
 pattern FVectorView r id dms strd = (r :< VectorView id dms strd)
-pattern FApply r lam vals          = (r :< Apply lam vals)
+pattern FApply r lam vals         = (r :< Apply lam vals)
+pattern FLet r n v e              = (r :< Let n v e)
 pattern FLambda r vars body       = (r :< Lambda vars body)
 pattern FVariable r id t          = (r :< Variable id t)
 pattern FMap r lam v              = (r :< Map lam v)
@@ -79,6 +81,9 @@ vec x = wrapExprF $ Vector x
 
 app :: Expr0 -> [Expr0] -> Expr0
 app l v = wrapExprF $ Apply l v
+
+bind :: Expr0 -> Expr0 -> Expr0 -> Expr0
+bind (FVariable _ n _) v e = wrapExprF $ Let n v e
 
 lam :: [Expr0] -> Expr0 -> Expr0
 lam v b = wrapExprF $ Lambda (map (\case FVariable _ i t -> (i, t)) v) b

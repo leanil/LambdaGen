@@ -30,7 +30,6 @@ dependencies:
 - random
 - recursion-schemes
 - text
-- validation
 - vinyl
 
 library:

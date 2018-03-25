@@ -14,7 +14,7 @@ View<double*,double> evaluator2(std::map<std::string, double*> bigVectors){
 		act_cgh->single_task<class SingleKernel>([=] () mutable {
 			[=](auto x){return
 			[=](auto y){return
-			[=](auto result){return
+			[=](auto result){
 			result=x+y;};};}(5.0)(12.0)(v_2147482884);
 		});
 	});

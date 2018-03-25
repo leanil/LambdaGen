@@ -19,10 +19,10 @@ View<double*,double,2> evaluator5(std::map<std::string, double*> bigVectors){
 		View<accessor,double,3,2> v_1838073155(std::array<size_t,2>{2,1},b_1838073155.get_access<rw_access>(cgh));
 		ParZip([=](auto x){return
 		[=](auto v){return
-		[=](auto result, unsigned thread_id){return
+		[=](auto result, unsigned thread_id){
 		Map([=](auto x){return
 		[=](auto y){return
-		[=](auto result){return
+		[=](auto result){
 		result=x*y;};};}(x),v,result);};};},vec471984148,mat1680077988,v_1838073155,4);
 	});
 	deviceQueue.submit([&] (cl::sycl::handler &cgh) {
@@ -34,10 +34,10 @@ View<double*,double,2> evaluator5(std::map<std::string, double*> bigVectors){
 		View<accessor,double,3,2> v_1838073155(std::array<size_t,2>{2,1},b_1838073155.get_access<rw_access>(cgh));
 		ParReduce([=](auto v1){return
 		[=](auto v2){return
-		[=](auto result, unsigned thread_id){return
+		[=](auto result, unsigned thread_id){
 		Zip([=](auto x){return
 		[=](auto y){return
-		[=](auto result){return
+		[=](auto result){
 		result=x+y;};};},v1,v2,result);};};},v_1838073155,v_2147482884,v_1645233509,4);
 	});
 	deviceQueue.submit([&] (cl::sycl::handler &cgh) {
@@ -49,10 +49,10 @@ View<double*,double,2> evaluator5(std::map<std::string, double*> bigVectors){
 		View<accessor,double,3,2> v_1838073155(std::array<size_t,2>{2,1},b_1838073155.get_access<rw_access>(cgh));
 		ParReduceJoin([=](auto v1){return
 		[=](auto v2){return
-		[=](auto result, unsigned thread_id){return
+		[=](auto result, unsigned thread_id){
 		Zip([=](auto x){return
 		[=](auto y){return
-		[=](auto result){return
+		[=](auto result){
 		result=x+y;};};},v1,v2,result);};};},v_1838073155,v_2147482884,v_1645233509,4);
 	});
 	return result;

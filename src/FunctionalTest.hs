@@ -33,11 +33,17 @@ test3 = (
             [scl 2]],
     "16")
 
-test4 = (
-    mkMap
-        (app (dotProd 3) [vecView "vec" [3]])
-        (vecView "mat" [2,3]),
-    "{50,122}")
+test4 = let v1 = var "v1" (power double (dim 3))
+            v2 = var "v2" (power double (dim 3))
+        in
+            (
+            mkMap
+                (lam [v2]
+                    (bind v1 (vecView "vec" [3])
+                        (mkReduce sclAdd
+                            (mkZipWith sclMul v1 v2))))
+                (vecView "mat" [2,3]),
+            "{50,122}")
 
 test5 = (
     mkReduce

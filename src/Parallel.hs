@@ -19,6 +19,8 @@ parallelizerAlg :: TypecheckT ∈ fields => Int -> CoAlgebra (Cofree ExprF ParDa
 parallelizerAlg _ (_ :< Apply a b, None) = (1, Just 1) ::< Apply (a,Started 1) (zip b (repeat None))
 parallelizerAlg _ (_ :< Apply a b, Started i) = (1, Nothing) ::< Apply (a,Started i) (zip b (repeat None))
 
+parallelizerAlg _ (_ :< Let n v e, Started i) = (1, Nothing) ::< Let n (v,None) (e,Started i)
+
 parallelizerAlg _ ((getType -> (FArrow _ FArrow{})) :< a, p@(Started _)) = parData p ::< fmap (,p) a
 parallelizerAlg _ (_ :< a, p@(Started i)) = parData p ::< fmap (,Full i) a
 
