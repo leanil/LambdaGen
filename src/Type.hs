@@ -54,4 +54,5 @@ dimCounterAlg (Power a b) = head b : a
 dimCounterAlg _ = []
 
 countDims :: Type -> [Int]
-countDims = cata dimCounterAlg
+countDims FDouble = [1]
+countDims t = cata dimCounterAlg t

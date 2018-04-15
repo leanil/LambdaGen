@@ -70,16 +70,16 @@ mSaveNode key n = Just $ M.singleton key $ Node $ fmap (const ()) n
 
 makeComp :: (Expr0, PExpr) -> Either (Maybe Match) (CofreeF ExprF (Maybe Match) (Expr0, PExpr))
 makeComp (_ :< n@Scalar{}, FPScalar i)                  = Right $ mSaveNode i n ::< castLeaf n
-makeComp (_ :< n@Addition{}, FPAddition c d)             = Right $ Nothing ::< zipExprF (,) n [c,d]
-makeComp (_ :< n@Multiplication{}, FPMultiplication c d) = Right $ Nothing ::< zipExprF (,) n [c,d]
+makeComp (_ :< n@Addition{}, FPAddition c d)             = Right $ Nothing ::< zipExprF n [c,d]
+makeComp (_ :< n@Multiplication{}, FPMultiplication c d) = Right $ Nothing ::< zipExprF n [c,d]
 makeComp (_ :< n@VectorView{}, FPVectorView i)          = Right $ mSaveNode i n ::< castLeaf n
-makeComp (_ :< n@Apply{}, FPApply c d)                   = Right $ Nothing ::< zipExprF (,) n (c:d)
-makeComp (_ :< n@Lambda{}, FPLambda i d)                = Right $ mSaveNode i n ::< zipExprF (,) n [d]
+makeComp (_ :< n@Apply{}, FPApply c d)                   = Right $ Nothing ::< zipExprF n (c:d)
+makeComp (_ :< n@Lambda{}, FPLambda i d)                = Right $ mSaveNode i n ::< zipExprF n [d]
 makeComp (_ :< n@Variable{}, FPVariable i)              = Right $ mSaveNode i n ::< castLeaf n
-makeComp (_ :< n@Map{}, FPMap c d)                       = Right $ Nothing ::< zipExprF (,) n [c,d]
-makeComp (_ :< n@Reduce{}, FPReduce c d)                 = Right $ Nothing ::< zipExprF (,) n [c,d]
-makeComp (_ :< n@ZipWith{}, FPZipWith d e f)             = Right $ Nothing ::< zipExprF (,) n [d,e,f]
-makeComp (_ :< n@Compose{}, FPCompose c d)               = Right $ Nothing ::< zipExprF (,) n [c,d]
+makeComp (_ :< n@Map{}, FPMap c d)                       = Right $ Nothing ::< zipExprF n [c,d]
+makeComp (_ :< n@Reduce{}, FPReduce c d)                 = Right $ Nothing ::< zipExprF n [c,d]
+makeComp (_ :< n@ZipWith{}, FPZipWith d e f)             = Right $ Nothing ::< zipExprF n [d,e,f]
+makeComp (_ :< n@Compose{}, FPCompose c d)               = Right $ Nothing ::< zipExprF n [c,d]
 makeComp (subTree, FPStar i)                            = Left $ Just $ M.singleton i (Expr subTree)
 makeComp _                                               = Left Nothing
 
@@ -105,7 +105,7 @@ fillReplacement match = cata alg where
     alg (PMultiplication a b) = RNil :< Multiplication a b
     alg (PVectorView n)       = RNil :< castLeaf (mGetNode match n)
     alg (PApply a b)          = RNil :< Apply a b
-    alg (PLambda n a)         = RNil :< zipExprF (flip const) (mGetNode match n) [a]
+    alg (PLambda n a)         = RNil :< zipWithExprF (flip const) (mGetNode match n) [a]
     alg (PVariable n)         = RNil :< castLeaf (mGetNode match n)
     alg (PMap l v)            = RNil :< Map l v
     alg (PReduce l v)         = RNil :< Reduce l v

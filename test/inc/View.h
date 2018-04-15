@@ -1,71 +1,145 @@
 #pragma once
 
-#include <algorithm>
-#include <array>
+#include "List.h"
+#include <functional>
 #include <iostream>
-#include <iterator>
+#include <memory>
+#include <type_traits>
+#include <utility>
 
-template<typename Ptr, typename T, size_t... Dims> struct View {};
-
-template<typename Ptr, typename T, size_t D1, size_t... Dims>
-struct View<Ptr, T, D1, Dims...> {
-
-    using stride_t = std::array<size_t, sizeof...(Dims)+1>;
-
-    View(stride_t stride, const Ptr& data, size_t base = 0) : stride(stride), data(data), base(base) {}
-
-    struct View<Ptr, T, D1, Dims...>& operator=(const View<Ptr, T, D1, Dims...>& other) {
-         for (size_t i = 0; i < D1; ++i) {
-             (*this)[i] = other[i];
-         }
-         return *this;
-    }
-
-    View<Ptr, T, Dims...> operator[](size_t idx) const {
-        std::array<size_t, sizeof...(Dims)> new_stride;
-        std::copy(std::next(stride.begin()), stride.end(), new_stride.begin());
-        return View<Ptr, T, Dims...>(new_stride, data, base + idx*stride[0]);
-    }
-
-    stride_t stride;
-    Ptr data;
-    size_t base;
+template<int D, int S>
+struct P {
+    static constexpr int dim = D;
+    static constexpr int stride = S;
 };
 
-template<typename Ptr, typename T, size_t D1, size_t... Dims>
-std::ostream& operator<<(std::ostream& out, const View<Ptr, T, D1, Dims...>& v) {
+//template<int D, int L, typename S> struct Subdiv;
+//
+//template<int D, int L, typename H, typename T>
+//struct Subdiv<D, L, List<H, T>> {
+//    using type = List<H, typename Subdiv<D - 1, L, T>::type>;
+//};
+//
+//template<int L, int D, int S, typename T>
+//struct Subdiv<0, L, List<P<D, S>, T>> {
+//    using type = List<P<L, D / L*S>, List<P<D / L, S>, T>>;
+//};
+//
+//template<int D, int L, typename S>
+//using subdiv_t = typename Subdiv<D, L, S>::type;
+//
+//template<int D, typename S> struct Flip;
+//
+//template<int D, typename H, typename T>
+//struct Flip<D, List<H, T>> {
+//    using type = List<H, typename Flip<D - 1, T>::type>;
+//};
+//
+//template<typename A, typename B, typename T>
+//struct Flip<0, List<A, List<B, T>>> {
+//    using type = List<B, List<A, T>>;
+//};
+//
+//template<int D, typename S>
+//using flip_t = typename Flip<D, S>::type;
+//
+template<typename Ptr, typename T, typename Ds> class View;
+//
+//template<int d, typename Ptr, typename T, typename Ds>
+//auto flip(View<Ptr, T, Ds> v) {
+//    return View<Ptr, T, flip_t<d, Ds>>(v.data);
+//}
+//
+//template<int d, int l, typename Ptr, typename T, typename Ds>
+//auto subdiv(View<Ptr, T, Ds> v) {
+//    return View<Ptr, T, subdiv_t<d, l, Ds>>(v.data);
+//}
+
+template<typename L>
+struct ViewSize {
+    template<typename A, typename B>
+    struct Prod {
+        using type = Int<A::dim * B()>;
+    };
+    using type = typename Foldr<Prod, Int<1>, L>::type;
+};
+
+template<typename Ptr, typename T, typename D, typename Ds>
+class View<Ptr, T, List<D, Ds>> {
+public:
+    View(Ptr data) : data(data) {}
+    View() : data(new T[ViewSize<List<D, Ds>>::type()]), share(data) {}
+
+    static constexpr int size = D::dim;
+
+    View<Ptr, T, List<D, Ds>>& operator=(const View<Ptr, T, List<D, Ds>>& other) const {
+        for (int i = 0; i < D::dim; ++i) {
+            (*this)[i] = other[i];
+        }
+        return *this;
+    }
+
+    auto operator[](int idx) const {
+        return View<Ptr, T, Ds>(data + idx*D::stride);
+    }
+
+    //template<typename I, typename... Idx>
+    //auto operator()(I i, Idx... idx) const {
+    //    return slice<EmptyList, List<D, Ds>>(0, i, idx...);
+    //}
+
+    Ptr data;
+    std::shared_ptr<T> share;
+private:
+    //template<typename SortedDims, typename Dims, typename I, typename... Idx, std::enable_if_t<std::is_placeholder_v<I> != 0, int> = 0>
+    //auto slice(int offset, I i, Idx... idx) const {
+    //    return slice<typename Insert<SortedDims, KeyValuePair<Int<std::is_placeholder_v<I>>, typename Dims::head>>::type, typename Dims::tail>(offset, idx...);
+    //}
+
+    //template<typename SortedDims, typename Dims, typename I, typename... Idx, std::enable_if_t<std::is_placeholder_v<I> == 0, int> = 0>
+    //auto slice(int offset, I i, Idx... idx) const {
+    //    return slice<SortedDims, typename Dims::tail>(offset + i * Dims::head::stride, idx...);
+    //}
+
+    //template<typename SortedDims, typename Dims>
+    //auto slice(int offset) const {
+    //    return View<Ptr, T, typename Concat<typename Map<SortedDims, get_value>::type, Dims>::type>(data + offset);
+    //}
+};
+
+template<typename Ptr, typename T, typename Dims>
+std::ostream& operator<<(std::ostream& out, const View<Ptr, T, Dims>& v) {
     out << "{";
-    for (size_t i = 0; i < D1; ++i) {
+    for (int i = 0; i < Dims::head::dim; ++i) {
         out << (i ? "," : "") << v[i];
     }
     return out << "}";
 }
 
-
 template<typename Ptr, typename T>
-struct View<Ptr, T> {
+class View<Ptr, T, EmptyList> {
+public:
+    View(Ptr data) : data(data) {}
+    View() : data(new T), share(data) {}
 
-    View(std::array<size_t, 0>, Ptr data, size_t base = 0) : data(data), base(base) {}
-
-    // Accessor index type should be cl::sycl::id (according to 3.4.6.3 of the spec), but it works only with integer;
-    View<Ptr, T>& operator=(const View<Ptr, T>& other) {
-        data[base] = other.data[other.base];
+    auto& operator=(const View<Ptr, T, EmptyList>& other) const {
+        *data = *other.data;
         return *this;
     }
 
-    void operator=(T x) {
-        data[base] = x;
+    void operator=(T x) const {
+        *data = x;
     }
 
     operator T() const {
-        return data[base];
+        return *data;
     }
 
     Ptr data;
-    size_t base;
+    std::shared_ptr<T> share;
 };
 
 template<typename Ptr, typename T>
-std::ostream& operator<<(std::ostream& out, const View<Ptr, T>& v) {
+std::ostream& operator<<(std::ostream& out, const View<Ptr, T, EmptyList>& v) {
     return out << (T)v;
 }

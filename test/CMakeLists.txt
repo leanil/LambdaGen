@@ -6,6 +6,7 @@ FILE(GLOB KERNELS kernel/evaluator*.hpp)
             
 add_executable(LambdaGen main.cpp
                          inc/helper.h
+                         inc/List.h
                          inc/my_sycl.h
                          inc/View.h
                          inc/tester.hpp

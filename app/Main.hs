@@ -1,17 +1,18 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators #-}
 
-import CodeGeneration
+
 import ConstFold
-import Cpp
+import CpuCodeGen
 import Expr
 import FunctionalTest
+import Metrics
 import Parallel
 import Print
 import Recursion
 import Storage
 import Typecheck
 import Control.Comonad (extract)
-import Data.Functor.Foldable (cata, para)
+import Data.Functor.Foldable (cata)
 import Data.List (intercalate)
 import Data.Proxy (Proxy(Proxy))
 import Data.Vinyl
@@ -19,12 +20,13 @@ import Data.Vinyl
 test :: Expr0
 test = fst test4
 
-process :: TypecheckT ∈ fields => Expr fields -> Expr (CodeGenT ': ResultPack ': Result ': ParData ': fields)
+process :: TypecheckT ∈ fields => Expr fields -> 
+    Expr (ResultPack ': Result ': ParData ': NodeId ': SubtreeSize ': fields)
 process expr =
-    para (annotatePara codeGenAlg) $
-    cata (annotate collectStgAlg) $
+    collectStorage $
     assignStorage $
     parallelize 4 $
+    assignNodeId $
     cata constFoldAlg expr
 
 main :: IO ()
@@ -33,7 +35,7 @@ main = do
     case fieldVal @TypecheckT $ extract tcd of
         (Left _) -> do
             let prd = process tcd
-            writeFile "../result.hpp" $ createEvaluator "evaluator" $ extract prd
+            writeFile "../test/result.hpp" $ cpuCodeGen "eval" prd
             putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT, ParData, Result])) prd
             --let var1 = cata constFoldAlg tcd
             --putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) var1

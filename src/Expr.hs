@@ -8,18 +8,17 @@ import Data.List
 import Data.Vinyl
 
 data ExprF a
-    = Scalar { getValue :: Double }
-    | Addition { left :: a, right :: a }
-    | Multiplication { left :: a, right :: a }
-    | VectorView { name :: String, dms :: [Int], strd :: [Int] }
-    | Vector { elements :: [a] }
-    | Apply { lambda :: a, values :: [a]}
-    | Let { name :: String, value :: a, inExpr :: a }
-    | Lambda { vars :: [(String,Type)], getBody :: a }
-    | Variable { name :: String, tp :: Type }
-    | Map { lambda :: a, vector :: a }
-    | Reduce { lambda :: a, vector :: a }
-    | ZipWith { lambda :: a, vector1 :: a, vector2 :: a }
+    = Scalar { getSclVal :: Double }
+    | Addition { getOpLeft :: a, getOpRight :: a }
+    | Multiplication { getOpLeft :: a, getOpRight :: a }
+    | VectorView { getName :: String, getViewDims :: [Int], getViewStrides :: [Int] }
+    | Apply { getLambda :: a, getArgs :: [a]}
+    | Let { getName :: String, getBoundVal :: a, getLetExpr :: a }
+    | Lambda { getParams :: [(String,Type)], getLambdaBody :: a }
+    | Variable { getName :: String, getVarType :: Type }
+    | Map { getLambda :: a, getVec :: a }
+    | Reduce { getLambda :: a, getVec :: a }
+    | ZipWith { getLambda :: a, getVec1 :: a, getVec2 :: a }
     -- | NZipWith { lambda :: a, vector1 :: a, vector2 :: a }
     | Compose a a
     deriving (Functor, Foldable, Traversable, Show)
@@ -27,16 +26,19 @@ data ExprF a
 castLeaf :: ExprF a -> ExprF b
 castLeaf = fmap (const undefined)
 
-zipExprF :: (a -> b -> c) -> ExprF a -> [b] -> ExprF c
-zipExprF f (Addition a b) (x:y:_) = Addition (f a x) (f b y)
-zipExprF f (Multiplication a b) (x:y:_) = Multiplication (f a x) (f b y)
-zipExprF f (Apply a b) (x:xs) = Apply (f a x) $ zipWith f b xs
-zipExprF f (Let n a b) (x:y:_) = Let n (f a x) (f b y)
-zipExprF f (Lambda a b) (x:_) = Lambda a (f b x)
-zipExprF f (Map a b) (x:y:_) = Map (f a x) (f b y)
-zipExprF f (Reduce a b) (x:y:_) = Reduce (f a x) (f b y)
-zipExprF f (ZipWith a b c) (x:y:z:_) = ZipWith (f a x) (f b y) (f c z)
-zipExprF _ a _ = castLeaf a
+zipWithExprF :: (a -> b -> c) -> ExprF a -> [b] -> ExprF c
+zipWithExprF f (Addition a b) (x:y:_) = Addition (f a x) (f b y)
+zipWithExprF f (Multiplication a b) (x:y:_) = Multiplication (f a x) (f b y)
+zipWithExprF f (Apply a b) (x:xs) = Apply (f a x) $ zipWith f b xs
+zipWithExprF f (Let n a b) (x:y:_) = Let n (f a x) (f b y)
+zipWithExprF f (Lambda a b) (x:_) = Lambda a (f b x)
+zipWithExprF f (Map a b) (x:y:_) = Map (f a x) (f b y)
+zipWithExprF f (Reduce a b) (x:y:_) = Reduce (f a x) (f b y)
+zipWithExprF f (ZipWith a b c) (x:y:z:_) = ZipWith (f a x) (f b y) (f c z)
+zipWithExprF _ a _ = castLeaf a
+
+zipExprF :: ExprF a -> [b] -> ExprF (a,b)
+zipExprF = zipWithExprF (,)
 
 type Expr fields = Cofree ExprF (HList fields)
 type Expr0 = Expr '[]
@@ -75,9 +77,6 @@ vecView' i d s = wrapExprF $ VectorView i d s
 transpose :: [Int] -> Expr0 -> Expr0
 transpose p (FVectorView _ i d s) = wrapExprF $ VectorView i (perm p d) (perm p s) where
     perm p' l = map snd $ sort $ zip p' l
-    
-vec :: [Expr0] -> Expr0
-vec x = wrapExprF $ Vector x
 
 app :: Expr0 -> [Expr0] -> Expr0
 app l v = wrapExprF $ Apply l v
@@ -108,3 +107,9 @@ comp a b = wrapExprF $ Compose a b
 
 defaultStrides :: [Int] -> [Int]
 defaultStrides = tail . scanr (*) 1
+
+isLeafNode :: ExprF a -> Bool
+isLeafNode (Scalar{}) = True
+isLeafNode (VectorView{}) = True
+isLeafNode (Variable{}) = True
+isLeafNode _ = False

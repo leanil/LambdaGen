@@ -1,17 +1,17 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings, QuasiQuotes, TypeApplications, TypeFamilies #-}
 
-import CodeGeneration
 import ConstFold
-import Cpp
+import CpuCodeGen
 import Expr
 import FunctionalTest
+import Metrics
 import Parallel
 import Recursion
 import Storage
 import Typecheck
 import Control.Comonad (extract)
 import Control.Monad (foldM)
-import Data.Functor.Foldable (cata, para)
+import Data.Functor.Foldable (cata)
 import Data.Text (Text, concat, pack, unpack)
 import NeatInterpolation
 import Prelude hiding (concat)
@@ -24,11 +24,11 @@ process test evalId =
     let tc = cata (annotate typecheckAlg) test in
     case fieldVal @TypecheckT $ extract tc of
     (Left _) -> writeFile ("test/kernel/" ++ evalId ++ ".hpp") $
-                createEvaluator evalId $ extract $
-                para (annotatePara codeGenAlg) $
-                cata (annotate collectStgAlg) $
+                cpuCodeGen evalId $
+                collectStorage $
                 assignStorage $
                 parallelize 4 $
+                assignNodeId $
                 cata constFoldAlg tc
 
     (Right errors) -> print errors
@@ -72,6 +72,7 @@ testCode includeText switchText =
             };
             switch (atoi(argv[1])) {
             $switchText
+            default: return 1;
             }
         }
     |]

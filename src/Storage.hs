@@ -3,84 +3,78 @@
 module Storage where
 
 import Expr
+import Metrics
 import Parallel
 import Recursion
 import Type
 import Typecheck
-import Control.Arrow
+import Control.Arrow ((&&&))
+import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
 import Data.List (intercalate)
-import Data.Monoid
-import Data.Vinyl
+import Data.Maybe (fromMaybe, isNothing)
+import Data.Monoid ((<>))
+import Data.Vinyl (rput, type (∈))
 import Data.Vinyl.Functor (Identity(..))
 import Data.Foldable (fold)
-import Data.Functor.Foldable (ana)
-import System.Random
+import Data.Functor.Foldable (ana, cata)
 
-type AssignStgT = (StdGen, Bool) -- (id generator, has to allocate)
-data ResultId = Inherit | Implicit String | Prealloc Int deriving Show
-data Result = Std ResultId | Red (ResultId, ResultId) deriving Show
+type AssignStgT = Maybe String -- (parent storage if the child can use it)
+data Result = Std (String,Bool) | WithTmp (String, String, Bool) deriving Show -- (storage id, is new allocation)
 
-getPrimary :: Result -> ResultId
-getPrimary (Std x) = x
-getPrimary (Red (x,_)) = x
+getPrimary :: Result -> String
+getPrimary (Std (x,_)) = x
+getPrimary (WithTmp (x,_,_)) = x
 
-assignStgAlg :: ParData ∈ fields => CoAlgebra (Cofree ExprF Result) ((Cofree ExprF (R fields)), AssignStgT)
+assignStgAlg :: (NodeId ∈ fields, ParData ∈ fields) => CoAlgebra (Cofree ExprF Result) (Expr fields, AssignStgT)
 
--- assignStgAlg (_ :< a, _) = Std Inherit ::< a
-assignStgAlg (_ :< a@Scalar{}, (_,False)) = Std Inherit ::< castLeaf a
-assignStgAlg (_ :< Scalar x, _) = Std (Implicit $ show x) ::< Scalar x
+assignStgAlg (_ :< Scalar x, s) = makeIdLeaf (show x) s ::< Scalar x
 
-assignStgAlg (_ :< VectorView i a b, (g, True)) = Std (Implicit viewName) ::< VectorView i a b where
-    viewName = i ++ show (fst $ next g)
+-- It's possible to use the same user data multiple times with different types
+assignStgAlg (r :< VectorView i a b, s) = makeIdLeaf (i ++ "_" ++ show (getNodeId r)) s ::< VectorView i a b
 
--- assignStgAlg (r :< Vector elements, s) = s' ::< (Vector $ zip elements (map (,True) $ unfoldr (Just .split) g'))where
---     (s', g') = assignHelper s Nothing
+assignStgAlg (_ :< Variable i t, s) = makeIdLeaf i s ::< Variable i t
 
-assignStgAlg (_ :< n@Addition{}, s) = r ::< zipExprF (,) n (zip g [True, True]) where
-    (r, g) = assignHelper s 2
+assignStgAlg (r :< n@Addition{}, s) = fst (makeId r s) ::< zipExprF n [Nothing, Nothing]
 
-assignStgAlg (_ :< Multiplication a b, s) = r ::< Multiplication (a,(g1,True)) (b,(g2,True)) where
-    (r, [g1,g2]) = assignHelper s 2
+assignStgAlg (r :< n@Multiplication{}, s) = fst (makeId r s) ::< zipExprF n [Nothing, Nothing]
 
-assignStgAlg (_ :< n@(Apply _ b), s) = r ::< zipExprF (,) n (zip g (False:repeat True)) where
-    (r, g) = assignHelper s (length b + 1)
+assignStgAlg (r :< n@(Apply _ _), s) = result ::< zipExprF n (Just myId:repeat Nothing) where
+    (result, myId) = makeId r s
 
-assignStgAlg (_ :< Let n v e, s) = r ::< Let n (v,(g1,True)) (e,(g2,False)) where
-    (r, [g1,g2]) = assignHelper s 2
+assignStgAlg (r :< Let n v e, s) = result ::< Let n (v,Nothing) (e, Just myId) where
+    (result, myId) = makeId r s
 
-assignStgAlg (_ :< Lambda v a, s) = Std Inherit ::< Lambda v (a,s)
+assignStgAlg (r :< Lambda v a, s) = result ::< Lambda v (a, Just myId) where
+    (result, myId) = makeId r s
 
-assignStgAlg (_ :< Variable i t, (_,False)) = Std Inherit ::< Variable i t
-assignStgAlg (_ :< Variable i t, _) = Std (Implicit i) ::< Variable i t
+assignStgAlg (r :< Map a b, s) = result ::< Map (a,Just (myId ++ idx)) (b,Nothing) where
+    (result, myId) = makeId r s
+    idx = "[" ++ makeHofIdx r ++ "]"
 
-assignStgAlg (_ :< Map a b, s) = r ::< Map (a,(g1,False)) (b,(g2,True)) where
-    (r, [g1,g2]) = assignHelper s 2
+assignStgAlg (r :< Reduce a b, s) = result ::< Reduce (a,Just myId) (b,Nothing) where
+    (result, myId) = makeId r s
+    -- (s'@(Std x), [g',g2]) = assignHelper s 2
+    -- (y, g1) = next g'
+    -- mkResult (snd . getParData -> Just _) = WithTmp (x,Prealloc y)
+    -- mkResult (snd . getParData -> Nothing) = s'
 
-assignStgAlg (r :< Reduce a b, s) = mkResult r ::< Reduce (a,(g1,False)) (b,(g2,True)) where
-    (s'@(Std x), [g',g2]) = assignHelper s 2
-    (y, g1) = next g'
-    mkResult (snd . getParData -> Just _) = Red (x,Prealloc y)
-    mkResult (snd . getParData -> Nothing) = s'
+assignStgAlg (r :< ZipWith a b c, s) = result ::< ZipWith (a,Just (myId ++ idx)) (b,Nothing) (c,Nothing) where
+    (result, myId) = makeId r s
+    idx = "[idx_" ++ show (getNodeId r) ++ "]"
 
-assignStgAlg (_ :< ZipWith a b c, s) = r ::< ZipWith (a,(g1,False)) (b,(g2,True)) (c,(g3,True)) where
-    (r, [g1,g2,g3]) = assignHelper s 3
+makeId :: NodeId ∈ fields => R fields -> Maybe String -> (Result, String)
+makeId (getNodeId -> nodeId) inherit = (Std (myId, isNothing inherit), myId) where
+    myId = fromMaybe ("v_" ++ show nodeId) inherit
 
-assignStgAlg (_ :< Compose a b, (g,_)) = r ::< Compose (a,(g1,False)) (b,(g2,False)) where
-    (r, [g1,g2]) = assignHelper (g,True) 2 
+makeIdLeaf :: String -> Maybe String -> Result
+makeIdLeaf name inherit = Std (fromMaybe name inherit, isNothing inherit)
 
-assignHelper :: AssignStgT -> Int -> (Result, [StdGen])
-assignHelper (g, False) n = (Std Inherit, splitN n g)
-assignHelper (g, True)  n = let (x, g') = next g in (Std $ Prealloc x, splitN n g')
+makeHofIdx :: NodeId ∈ fields => R fields -> String
+makeHofIdx r = "idx_" ++ show (getNodeId r)
 
-splitN :: Int -> StdGen -> [StdGen]
-splitN 1 g = [g]
-splitN n g = let (g1,g2) = split g in g1 : splitN (n-1) g2
-
-assignStorage :: ParData ∈ fields => Cofree ExprF (R fields) -> Cofree ExprF (R (Result ': fields))
-assignStorage e = root $ ana (annotateAna assignStgAlg) (e,(mkStdGen 0, True)) where
-    root t@((getPrimary . fieldVal -> Prealloc _) :< _) = t
-    root (r :< t) = rput (Identity $ Std $ Prealloc 0) r :< t
+assignStorage :: (NodeId ∈ fields, ParData ∈ fields) => Expr fields -> Expr (Result ': fields)
+assignStorage e = ana (annotateAna assignStgAlg) (e,Just "result")
 
 dims :: [Int] -> Int -> String
 dims d 1 = concatMap (("," ++) . show) d
@@ -94,11 +88,11 @@ viewType :: MemStruct -> Int -> String -> (String,String)
 viewType m@(d,_) tn ptrType = ("View<" ++ ptrType ++ ",double" ++ dims d tn ++ ">", strides m tn)
 
 newtype ResultPack = ResultPack ([ResultStg], [BigVector]) deriving Show -- collect vecView dimensions to allocate buffers for user data
-data ResultStg = ResultStg { name :: Int, tnum :: Int, getMem :: MemStruct } deriving (Eq, Show, Ord)
-data BigVector = BigVector { name :: String, dataId :: String, getMem :: MemStruct } deriving (Eq, Show, Ord)
+data ResultStg = ResultStg { getName :: String, getThreadNum :: Int, getMem :: MemStruct } deriving (Eq, Show, Ord)
+data BigVector = BigVector { getName :: String, getDataId :: String, getMem :: MemStruct } deriving (Eq, Show, Ord)
 type MemStruct = ([Int], [Int])
 
-defaultMem :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => R (fields) -> MemStruct
+defaultMem :: TypecheckT ∈ fields => R (fields) -> MemStruct
 defaultMem (countDims . getType -> ds) = (ds, defaultStrides ds)
 
 merge :: Ord a => [a] -> [a] -> [a]
@@ -115,18 +109,15 @@ instance Monoid ResultPack where
 
 collectStgAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
 
-collectStgAlg ((fieldVal -> Std (Implicit i)) ::< VectorView di d s) = ResultPack([], [BigVector i di (d,s)])
+collectStgAlg ((fieldVal -> Std (name,_)) ::< VectorView dataId d s) = ResultPack([], [BigVector name dataId (d,s)])
 
-collectStgAlg (r ::< node) = getStgAndDims r <> fold node
-
-collectStgAlg (r@(snd . getParData -> Just t) ::< Compose a b) = 
-    ResultPack ([ResultStg x t (defaultMem r)],[]) <> a <> b where
-        Prealloc x = getPrimary $ fieldVal r
-collectStgAlg (r ::< Compose a b) = getStgAndDims r <> a <> b
+collectStgAlg (r ::< node) = (if isLeafNode node then mempty else getStgAndDims r) <> fold node
 
 getStgAndDims :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => R (fields) -> ResultPack
-getStgAndDims r = ResultPack (std r ++ temp r, []) where
-    std (getPrimary . fieldVal &&& fst . getParData -> (Prealloc x, t)) = [ResultStg x t (defaultMem r)]
-    std (getPrimary . fieldVal -> _) = []
-    temp (fieldVal &&& snd . getParData -> (Red (_,Prealloc x), Just t)) = [ResultStg x t (defaultMem r)]
-    temp _ = []
+getStgAndDims r@(fieldVal &&& fst . getParData -> (Std (x,True), t)) = ResultPack ([ResultStg x t (defaultMem r)], [])
+getStgAndDims (fieldVal -> (Std _)) = ResultPack ([], [])
+
+collectStorage :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Expr fields -> Expr (ResultPack ': fields)
+collectStorage expr = (rput (Identity $ returnResult <> p) r :< node)  where
+    (r@(fieldVal -> p@ResultPack{}) :< node) = cata (annotate collectStgAlg) expr
+    returnResult = ResultPack ([ResultStg "result" 1 (defaultMem $ extract expr)],[])
