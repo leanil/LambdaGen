@@ -13,48 +13,40 @@ import Data.Vinyl.TypeLevel (RecAll)
 
 newtype IndentT = IndentT Int deriving Show
 
-inc :: IndentT -> IndentT
-inc (IndentT i) = IndentT $ i+1
-
-getIndent :: IndentT ∈ fields => R fields -> Int
-getIndent (fieldVal -> IndentT i) = i
-
 indent :: Cofree ExprF (R fields) -> Cofree ExprF (R (IndentT ': fields))
 indent e = ana indentAlg (e,IndentT 0)
 
 indentAlg :: CoAlgebra (Cofree ExprF (R (IndentT ': fields))) ((Cofree ExprF (R fields)), IndentT)
-indentAlg (r :< node, i) = (Identity i :& r) ::< fmap (,inc i) node
+indentAlg (r :< node, i) = (Identity i :& r) ::< fmap (,inc i) node where
+    inc (IndentT ind) = IndentT $ ind+1
 
 printerAlg :: forall fields select . (IndentT ∈ fields, select ⊆ fields, RecAll Identity select Show) =>
     Proxy (R select) -> Algebra (Cofree ExprF (R fields)) String
 
 printerAlg _ (r ::< Scalar x) = mkTabs r ++ "Scalar " ++ show x ++ ": " ++ show (rcast r :: R select) ++ "\n"
 
-printerAlg _ (r ::< VectorView i _ _) = mkTabs r ++ "VectorView " ++ i ++ ": " ++ show (rcast r :: R select) ++ "\n"
+printerAlg _ (r ::< View i _ _) = mkTabs r ++ "VectorView " ++ i ++ ": " ++ show (rcast r :: R select) ++ "\n"
 
-printerAlg _ (r ::< Addition a b) = mkTabs r ++ "Addition: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
-
-printerAlg _ (r ::< Multiplication a b) = mkTabs r ++ "Multiplication: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
+printerAlg _ (r ::< ScalarOp op a b) = mkTabs r ++ "ScalarOp(" ++ op:") " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
 
 printerAlg _ (r ::< Apply a b) = mkTabs r ++ "Apply: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ concat b
 
-printerAlg _ (r ::< Let n a b) = mkTabs r ++ "Let " ++ n ++ ": " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
-
-printerAlg _ (r ::< Lambda v a) = mkTabs r ++ "Lambda" ++ (concatMap ((' ':) . fst) v) ++ ": " ++ show (rcast r :: R select) ++ "\n" ++ a
+printerAlg _ (r ::< Lambda vs b a) = mkTabs r ++ "Lambda" ++ (concatMap ((' ':) . fst) vs) ++ ": " ++ show (rcast r :: R select) ++ "\n" ++
+                                    concatMap (\(n,v) -> n ++ " = " ++ v) b ++ a
 
 printerAlg _ (r ::< Variable i _) = mkTabs r ++ "Variable " ++ i ++ ": " ++ show (rcast r :: R select) ++ "\n"
 
-printerAlg _ (r ::< Map a b) = mkTabs r ++ "Map: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
+printerAlg _ (r ::< RnZ a b c) = mkTabs r ++ "RnZ: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b ++ concat c
 
-printerAlg _ (r ::< Reduce a b) = mkTabs r ++ "Reduce: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
+printerAlg _ (r ::< ZipWithN a b) = mkTabs r ++ "ZipWithN: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ concat b
 
-printerAlg _ (r ::< ZipWith a b c) = mkTabs r ++ "ZipWith: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b ++ c
+printerAlg _ (r ::< Flip a b) = mkTabs r ++ "Flip " ++ show a ++ ": " ++ show (rcast r :: R select) ++ "\n" ++ b
 
-printerAlg _ (r ::< Compose a b) = mkTabs r ++ "Compose: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
+printerAlg _ (r ::< Subdiv a b c) = mkTabs r ++ "Subdiv " ++ show a ++ " " ++ show b ++ ": " ++ show (rcast r :: R select) ++ "\n" ++ c
 
 printExpr :: (select ⊆ (IndentT : fields), RecAll Identity select Show) =>
      Proxy (R select) -> Cofree ExprF (R fields) ->  String
 printExpr s e = cata (printerAlg s) $ indent e
 
 mkTabs :: IndentT ∈ fields => R fields -> String
-mkTabs r = replicate (getIndent r) '\t'
+mkTabs (fieldVal -> IndentT i) = replicate i '\t'

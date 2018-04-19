@@ -24,20 +24,21 @@ typeError5 = mkMap (scl 0) (scl 0)
 
 typeError6 =
     mkMap
-        (lam [var "x" (power double (dim 1))] (scl 0))
+        (lam [var "x" (power double [1])] (scl 0))
         v1
 
-typeError7 = mkReduce (lam [x] (scl 0)) (scl 0)
+typeError7 = mkReduce (lam [x] (scl 0)) x (scl 0)
 
 typeError8 =
     mkReduce
-        (lam [var "x" (power double (dim 1))]
+        (lam [var "x" (power double [1])]
             (lam [y] (scl 0)))
+        x
         v1
 
 typeError9 =
     mkZipWith
-        (lam [var "x" (power double (dim 1))]
+        (lam [var "x" (power double [1])]
             (lam [y] (scl 0)))
         v2
         v1

@@ -9,6 +9,8 @@ auto evaluator2(std::map<std::string, double*> userData) {
     [=](auto x, auto y){
         
         
+        
+        
         result = x + y;
     }(5.0, 12.0);
     return result;

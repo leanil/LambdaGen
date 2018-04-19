@@ -12,50 +12,47 @@ import Typecheck
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
 import Data.Functor.Foldable (para)
-import Data.Text (Text, append, pack, unpack)
+import Data.Text (Text, append, pack, singleton, unpack)
 import Data.Vinyl
 
 newtype CpuCodeT = CpuCodeT Text deriving Show
-cpuCodeGenAlg :: (Result ∈ fields, NodeId ∈ fields, TypecheckT ∈ fields) => RAlgebra (Expr fields) CpuCodeT
+cpuCodeGenAlg :: (NodeId ∈ fields, Result ∈ fields, NodeId ∈ fields, TypecheckT ∈ fields) => RAlgebra (Expr fields) CpuCodeT
 
 cpuCodeGenAlg ((fieldVal -> Std (_,True)) ::< Scalar{}) = CpuCodeT ""
 cpuCodeGenAlg ((fieldVal -> Std (mem,_)) ::< Scalar x) = CpuCodeT $ assignTemplate (pack mem) (pack (show x))
 
-cpuCodeGenAlg ((fieldVal -> Std (_,True)) ::< VectorView{}) = CpuCodeT ""
-cpuCodeGenAlg ((fieldVal -> Std (mem,_)) ::< VectorView name _ _) = CpuCodeT $ assignTemplate (pack mem) (pack name)
+cpuCodeGenAlg ((fieldVal -> Std (_,True)) ::< View{}) = CpuCodeT ""
+cpuCodeGenAlg ((fieldVal -> Std (mem,_)) ::< View name _ _) = CpuCodeT $ assignTemplate (pack mem) (pack name)
 
 cpuCodeGenAlg ((fieldVal -> Std (_,True)) ::< Variable{}) = CpuCodeT ""
 cpuCodeGenAlg ((fieldVal -> Std (mem,_)) ::< Variable name _) = CpuCodeT $ assignTemplate (pack mem) (pack name)
 
-cpuCodeGenAlg (r ::< Addition (ra :< _,CpuCodeT a) (rb :< _,CpuCodeT b)) =
-    CpuCodeT $ addTemplate a b (getResultId r) (getResultId ra) (getResultId rb)
-
-cpuCodeGenAlg (r ::< Multiplication (ra :< _,CpuCodeT a) (rb :< _,CpuCodeT b)) =
-    CpuCodeT $ mulTemplate a b (getResultId r) (getResultId ra) (getResultId rb)
+cpuCodeGenAlg (r ::< ScalarOp op (ra :< _,CpuCodeT a) (rb :< _,CpuCodeT b)) =
+    CpuCodeT $ scalarOpTemplate a b (getResultId r) (getResultId ra) (singleton op) (getResultId rb)
 
 cpuCodeGenAlg (_ ::< Apply (_,CpuCodeT a) vals) =
     CpuCodeT $ appTemplate evals a names where
         (evals,names) = unzip $ map (\(rb :< _,CpuCodeT b) -> (b,getResultId rb)) vals
-
-cpuCodeGenAlg (_ ::< Let n (ra :< _,CpuCodeT a) (_,CpuCodeT b)) =
-    CpuCodeT $ letTemplate a (pack n) (getResultId ra) b
        
-cpuCodeGenAlg (_ ::< Lambda vs (_,CpuCodeT a)) =
-    CpuCodeT $ lambdaTemplate (map (append "auto " . pack . fst) vs) a
+cpuCodeGenAlg (_ ::< Lambda vs binds (_,CpuCodeT a)) =
+    CpuCodeT $ lambdaTemplate (map (append "auto " . pack . fst) vs) evals names values a where
+        (evals, names, values) = unzip3 $ map (\(n,(r :< _,CpuCodeT b)) -> (b,pack n,getResultId r)) binds
 
-cpuCodeGenAlg (r ::< Map (_,CpuCodeT a) (rb :< _,CpuCodeT b)) =
-    CpuCodeT $ mapTemplate b (pack $ makeHofIdx r) (pack $ show $ getVecSize rb) a (getResultId rb)
+cpuCodeGenAlg (r ::< RnZ (_,CpuCodeT a) (_,CpuCodeT b) vs@(unzipCodes -> (evals,names))) =
+    CpuCodeT $ rnzTemplate evals resultId temp (pack $ makeHofIdx r) (pack $ show $ getVecSize vs) a b names where
+        resultId = getResultId r
+        temp = append "tmp_" $ pack $ show $ getNodeId r
 
-cpuCodeGenAlg (r ::< Reduce (_,CpuCodeT a) (rb :< _,CpuCodeT b)) =
-    CpuCodeT $ reduceTemplate b (getResultId r) (pack $ makeHofIdx r) (pack $ show $ getVecSize rb) a (getResultId rb)
+cpuCodeGenAlg (r ::< ZipWithN (_,CpuCodeT a) vs@(unzipCodes -> (evals,names))) =
+    CpuCodeT $ zipWithNTemplate evals (pack $ makeHofIdx r) (pack $ show $ getVecSize vs) a names
 
-cpuCodeGenAlg (r ::< ZipWith (_,CpuCodeT a) (rb :< _,CpuCodeT b) (rc :< _,CpuCodeT c)) =
-    CpuCodeT $ zipWithTemplate b c (pack $ makeHofIdx r) (pack $ show $ getVecSize rb) a (getResultId rb) (getResultId rc)
+unzipCodes :: Result ∈ fields => [(Expr fields,CpuCodeT)] -> ([Text],[Text])
+unzipCodes = unzip . map (\(r :< _,CpuCodeT a) -> (a,getResultId r))
 
-getVecSize :: TypecheckT ∈ fields => R fields -> Int
-getVecSize (getType -> FPower _ (FDim s)) = s
+getVecSize :: TypecheckT ∈ fields => [(Expr fields,a)] -> Int
+getVecSize (((getType -> FPower _ (s:_)) :< _,_):_) = s
 
-cpuCodeGen :: (Result ∈ fields, ResultPack ∈ fields, NodeId ∈ fields, TypecheckT ∈ fields) => 
+cpuCodeGen :: (NodeId ∈ fields, Result ∈ fields, ResultPack ∈ fields, NodeId ∈ fields, TypecheckT ∈ fields) => 
     String -> Expr fields -> String
 cpuCodeGen evalName expr = unpack $ cpuEvaluatorTemplate (pack evalName) userData allocViews evalCode resultName where
     ResultPack (alloc, user) = fieldVal $ extract expr

@@ -1,21 +1,21 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, TypeApplications, TypeOperators, ViewPatterns #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, LambdaCase, TypeApplications, TypeOperators, ViewPatterns #-}
 
 module Typecheck where
 
 import Expr
 import Recursion
 import Type
-import TypePrinter
 import Control.Comonad.Cofree (Cofree)
-import Data.Either
-import Data.Maybe
+import Data.Either (lefts)
+import Data.List (intercalate, nub)
+import Data.Maybe (catMaybes, mapMaybe)
 import Data.Vinyl
 
 type Error = String
 type TypecheckT = Either Type [Error]
 
-allLeft :: [TypecheckT] -> (Bool, [Type])
-allLeft x = let r = lefts x in (length r == length x, r)
+allLeft :: [TypecheckT] -> Maybe [Type]
+allLeft x = let l = lefts x in if length l == length x then Just l else Nothing
 
 typecheckAlg :: Algebra (Cofree ExprF (R fields)) TypecheckT
 
@@ -23,40 +23,48 @@ typecheckAlg (_ ::< Scalar _) = Left double
 
 typecheckAlg (_ ::< Variable _ t) = Left t
 
-typecheckAlg (_ ::< VectorView _ d _) = Left $ foldr (flip power . dim) double d
+typecheckAlg (_ ::< View _ d _) = Left $ power double d
 
-typecheckAlg (_ ::< Addition (Left FDouble) (Left FDouble)) = Left double
-typecheckAlg (_ ::< Addition (Left a) (Left b)) = Right $ mapMaybe scalarCheck [a,b]
-                      
-typecheckAlg (_ ::< Multiplication (Left FDouble) (Left FDouble)) = Left double
-typecheckAlg (_ ::< Multiplication (Left a) (Left b)) = Right $ mapMaybe scalarCheck [a,b] 
+typecheckAlg (_ ::< ScalarOp _ (Left FDouble) (Left FDouble)) = Left double
+typecheckAlg (_ ::< ScalarOp _ (Left a) (Left b)) = Right $ mapMaybe scalarCheck [a,b]
 
-typecheckAlg (_ ::< Apply (Left (FArrow a b)) (allLeft -> (True, c)))
+typecheckAlg (_ ::< Apply (Left (FArrow a b)) (allLeft -> Just c))
     | length c > length a = Right ["more arguments than lambda parameters in Apply"]
     | and (zipWith (==) a c) = Left $ if length a == length c then b else arrow (drop (length c) a) b
     | otherwise = Right $ catMaybes (zipWith eqCheck a c)       
 typecheckAlg (_ ::< Apply (Left a) _) = Right $ [showT a ++ " not a lambda"]
 
-typecheckAlg (_ ::< Let _ (Left _) (Left e)) = Left e
+typecheckAlg (_ ::< Lambda v (allLeft . map snd -> Just _) (Left b)) = Left $ arrow (map snd v) b
 
-typecheckAlg (_ ::< Lambda v (Left b)) = Left $ arrow (map snd v) b
-        
-typecheckAlg (_ ::< Map (Left (FArrow [a] b)) (Left (FPower c d)))
-    | a == c = Left $ power b d
-    | otherwise = Right $ catMaybes [eqCheck a c]
-typecheckAlg (_ ::< Map (Left a) (Left b)) = Right $ catMaybes [lambdaCheck a, vectorCheck b]
+typecheckAlg (_ ::< RnZ (Left (FArrow [a,b] c)) (Left (FArrow d e)) (allLeft -> Just f)) =
+    typeOrErrors a [eqCheck a b, eqCheck a c, eqCheck a e, eqVectorCheck f, varMatchCheck d f]
+typecheckAlg (_ ::< RnZ (Left a) (Left b) (allLeft -> Just c)) = Right $ catMaybes [biLambdaCheck a, biLambdaCheck b, eqVectorCheck c]            
 
-typecheckAlg (_ ::< Reduce (Left (FArrow [a,b] c)) (Left v@(FPower d (FDim e))))
-    | a == b && a == c && a == d && e /= 0 = Left a
-    | otherwise = Right $ catMaybes [eqCheck a b, eqCheck a c, eqCheck a d] ++ [showT v ++ " is an empty vector" | e == 0]
-typecheckAlg (_ ::< Reduce (Left a) (Left b)) = Right $ catMaybes [biLambdaCheck a, vectorCheck b]            
+typecheckAlg (_ ::< ZipWithN (Left (FArrow a b)) (allLeft -> Just c)) =
+    typeOrErrors (raiseToPower b $ fstDim $ head c) [eqVectorCheck c, varMatchCheck a c]
+typecheckAlg (_ ::< ZipWithN (Left a) (allLeft -> Just b)) = Right $ catMaybes [biLambdaCheck a, eqVectorCheck b]   
 
-typecheckAlg (_ ::< ZipWith (Left (FArrow [a,b] c)) (Left (FPower d e)) (Left (FPower f g)))
-    | a == d && b == f && e == g = Left $ power c e
-    | otherwise = Right $ catMaybes [eqCheck a d, eqCheck b f, eqCheck e g]
-typecheckAlg (_ ::< ZipWith (Left a) (Left b) (Left c)) = Right $ catMaybes [biLambdaCheck a, vectorCheck b, vectorCheck c]   
+typecheckAlg (_ ::< Flip (i,j) (Left (FPower a b)))
+    | min i j >= 0 && max i j < length b = Left $ power a (swap i j b)
+    | otherwise = Right ["flip index out of range"]
+
+typecheckAlg (_ ::< Subdiv i block (Left (FPower a b)))
+    | i < 0 || i >= length b = Right ["subdiv index out of range"]
+    | mod (b !! i) block /= 0 = Right ["subdiv block size incompatible"]
+    | otherwise = Left $ power a $ take i b ++ [div (b !! i) block, block] ++ drop (i+1) b
 
 typecheckAlg (_ ::< node) = Right $ foldMap (either (const []) id) node
+
+swap :: Int -> Int -> [a] -> [a]
+swap i j xs = [get k x | (k, x) <- zip [0..] xs]
+    where get k x | k == i = xs !! j
+                  | k == j = xs !! i
+                  | otherwise = x
+
+typeOrErrors :: Type -> [Maybe Error] -> TypecheckT
+typeOrErrors t (catMaybes -> err) = case err of
+    [] -> Left t
+    xs -> Right xs
 
 eqCheck :: Type -> Type -> Maybe Error
 eqCheck a b
@@ -74,6 +82,26 @@ lambdaCheck a = Just $ showT a ++ " not an unary lambda"
 biLambdaCheck :: Type -> Maybe Error
 biLambdaCheck (FArrow [_,_] _) = Nothing
 biLambdaCheck a = Just $ showT a ++ " not a binary lambda"
+
+eqVectorCheck :: [Type] -> Maybe Error
+eqVectorCheck (nub . map fstDim -> [s]) | s > 0 = Nothing
+eqVectorCheck a = Just $ show a ++ " sould be a non-empty list of equal sized (non-empy) vectors"
+
+fstDim :: Type -> Int
+fstDim (FPower _ (x:_)) = x
+fstDim _ = -1
+
+elemType :: Type -> Type
+elemType (FPower a b@(_:_:_)) = power a (tail b)
+elemType (FPower a [_]) = a
+
+varMatchCheck :: [Type] -> [Type] -> Maybe Error
+varMatchCheck vs as 
+    | length vs == length as =
+        case catMaybes $ zipWith eqCheck vs (map elemType as) of
+            [] -> Nothing
+            xs -> Just $ "[" ++ intercalate "," xs ++ "]"
+    | otherwise = Just $ show vs ++ " and " ++ show as ++ " shold have equal length"
 
 vectorCheck :: Type ->  Maybe Error
 vectorCheck (FPower _ _) = Nothing

@@ -10,9 +10,13 @@ auto evaluator3(std::map<std::string, double*> userData) {
     [=](auto x){
         
         
+        
+        
         v_6 = x + x;
     }(2.0);
     [=](auto y){
+        
+        
         
         
         result = y * y;

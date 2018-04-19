@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, DeriveFunctor, DeriveFoldable, DeriveTraversable, LambdaCase, FlexibleInstances, PatternSynonyms, TypeSynonymInstances #-}
+{-# LANGUAGE DataKinds, DeriveFunctor, DeriveFoldable, DeriveTraversable, LambdaCase, FlexibleInstances, PatternSynonyms, TypeSynonymInstances, ViewPatterns #-}
 
 module Expr where
 
@@ -9,32 +9,26 @@ import Data.Vinyl
 
 data ExprF a
     = Scalar { getSclVal :: Double }
-    | Addition { getOpLeft :: a, getOpRight :: a }
-    | Multiplication { getOpLeft :: a, getOpRight :: a }
-    | VectorView { getName :: String, getViewDims :: [Int], getViewStrides :: [Int] }
+    | ScalarOp { getOp :: Char, getOpLeft :: a, getOpRight :: a }
+    | View { getName :: String, getViewDims :: [Int], getViewStrides :: [Int] }
     | Apply { getLambda :: a, getArgs :: [a]}
-    | Let { getName :: String, getBoundVal :: a, getLetExpr :: a }
-    | Lambda { getParams :: [(String,Type)], getLambdaBody :: a }
+    | Lambda { getParams :: [(String,Type)], getBindings :: [(String,a)], getLambdaBody :: a }
     | Variable { getName :: String, getVarType :: Type }
-    | Map { getLambda :: a, getVec :: a }
-    | Reduce { getLambda :: a, getVec :: a }
-    | ZipWith { getLambda :: a, getVec1 :: a, getVec2 :: a }
-    -- | NZipWith { lambda :: a, vector1 :: a, vector2 :: a }
-    | Compose a a
+    | RnZ { getReducer :: a, getZipper :: a, getVecs :: [a] }
+    | ZipWithN { getLambda :: a, getVecs :: [a] }
+    | Flip { getDims :: (Int,Int), getExpr :: a }
+    | Subdiv { getDim :: Int, getBlockSize :: Int, getExpr :: a }
     deriving (Functor, Foldable, Traversable, Show)
 
 castLeaf :: ExprF a -> ExprF b
 castLeaf = fmap (const undefined)
 
 zipWithExprF :: (a -> b -> c) -> ExprF a -> [b] -> ExprF c
-zipWithExprF f (Addition a b) (x:y:_) = Addition (f a x) (f b y)
-zipWithExprF f (Multiplication a b) (x:y:_) = Multiplication (f a x) (f b y)
+zipWithExprF f (ScalarOp op a b) (x:y:_) = ScalarOp op (f a x) (f b y)
 zipWithExprF f (Apply a b) (x:xs) = Apply (f a x) $ zipWith f b xs
-zipWithExprF f (Let n a b) (x:y:_) = Let n (f a x) (f b y)
-zipWithExprF f (Lambda a b) (x:_) = Lambda a (f b x)
-zipWithExprF f (Map a b) (x:y:_) = Map (f a x) (f b y)
-zipWithExprF f (Reduce a b) (x:y:_) = Reduce (f a x) (f b y)
-zipWithExprF f (ZipWith a b c) (x:y:z:_) = ZipWith (f a x) (f b y) (f c z)
+zipWithExprF f (Lambda a b c) (splitAt (length b) -> (xs,x:_)) = Lambda a (zipWith (\(s,p) q -> (s,f p q)) b xs) (f c x)
+zipWithExprF f (RnZ a b c) (x:y:xs) = RnZ (f a x) (f b y) (zipWith f c xs)
+zipWithExprF f (ZipWithN a b) (x:xs) = ZipWithN (f a x) (zipWith f b xs)
 zipWithExprF _ a _ = castLeaf a
 
 zipExprF :: ExprF a -> [b] -> ExprF (a,b)
@@ -44,17 +38,13 @@ type Expr fields = Cofree ExprF (HList fields)
 type Expr0 = Expr '[]
 
 pattern FScalar r d               = (r :< Scalar d)
-pattern FAddition r a b           = (r :< Addition a b)
-pattern FMultiplication r a b     = (r :< Multiplication a b)
-pattern FVectorView r id dms strd = (r :< VectorView id dms strd)
+pattern FScalarOp r op a b        = (r :< ScalarOp op a b)
+pattern FView r id dms strd       = (r :< View id dms strd)
 pattern FApply r lam vals         = (r :< Apply lam vals)
-pattern FLet r n v e              = (r :< Let n v e)
-pattern FLambda r vars body       = (r :< Lambda vars body)
+pattern FLambda r vars binds body = (r :< Lambda vars binds body)
 pattern FVariable r id t          = (r :< Variable id t)
-pattern FMap r lam v              = (r :< Map lam v)
-pattern FReduce r lam v           = (r :< Reduce lam v)
-pattern FZipWith r lam v1 v2      = (r :< ZipWith lam v1 v2)
-pattern FCompose r a b            = (r :< Compose a b)
+pattern FRnZ r l1 l2 v            = (r :< RnZ l1 l2 v)
+pattern FZipWithN r lam v         = (r :< ZipWithN lam v)
 
 wrapExprF :: ExprF Expr0 -> Expr0
 wrapExprF = (RNil :<)
@@ -63,53 +53,61 @@ scl :: Double -> Expr0
 scl = wrapExprF . Scalar
 
 add :: Expr0 -> Expr0 -> Expr0
-add x y = wrapExprF $ Addition x y
+add x y = wrapExprF $ ScalarOp '+' x y
 
 mul :: Expr0 -> Expr0 -> Expr0
-mul x y = wrapExprF $ Multiplication x y
+mul x y = wrapExprF $ ScalarOp '*' x y
 
 vecView :: String -> [Int] -> Expr0
-vecView i d = wrapExprF $ VectorView i d (defaultStrides d)
+vecView i d = wrapExprF $ View i d (defaultStrides d)
 
 vecView' :: String -> [Int] -> [Int] ->Expr0
-vecView' i d s = wrapExprF $ VectorView i d s
+vecView' i d s = wrapExprF $ View i d s
 
 transpose :: [Int] -> Expr0 -> Expr0
-transpose p (FVectorView _ i d s) = wrapExprF $ VectorView i (perm p d) (perm p s) where
+transpose p (FView _ i d s) = wrapExprF $ View i (perm p d) (perm p s) where
     perm p' l = map snd $ sort $ zip p' l
 
 app :: Expr0 -> [Expr0] -> Expr0
 app l v = wrapExprF $ Apply l v
 
-bind :: Expr0 -> Expr0 -> Expr0 -> Expr0
-bind (FVariable _ n _) v e = wrapExprF $ Let n v e
+-- bind :: Expr0 -> Expr0 -> Expr0 -> Expr0
+-- bind (FVariable _ n _) v e = wrapExprF $ Let n v e
+
+lamBind :: [Expr0] -> [(Expr0,Expr0)] -> Expr0 -> Expr0
+lamBind v bind body = wrapExprF $ Lambda 
+    (map (\(FVariable _ i t) -> (i, t)) v)
+    (map (\(FVariable _ i _, e) -> (i,e)) bind) body
 
 lam :: [Expr0] -> Expr0 -> Expr0
-lam v b = wrapExprF $ Lambda (map (\case FVariable _ i t -> (i, t)) v) b
+lam v body = lamBind v [] body
 
-lam' :: [(String,Type)] -> Expr0 -> Expr0
-lam' v b = wrapExprF $ Lambda v b
+lam' :: [(String,Type)] -> [(String,Expr0)] -> Expr0 -> Expr0
+lam' v bind body = wrapExprF $ Lambda v bind body
 
 var :: String -> Type -> Expr0
 var i t = wrapExprF $ Variable i t
 
 mkMap :: Expr0 -> Expr0 -> Expr0
-mkMap l v = wrapExprF $ Map l v
+mkMap l v = wrapExprF $ ZipWithN l [v]
 
-mkReduce :: Expr0 -> Expr0 -> Expr0
-mkReduce l v = wrapExprF $ Reduce l v
+mkReduce :: Expr0 -> Expr0 -> Expr0 -> Expr0
+mkReduce l v vec = wrapExprF $ RnZ l (lam [v] v) [vec]
+
+mkRnZ :: Expr0 -> Expr0 -> [Expr0] -> Expr0
+mkRnZ r z vs = wrapExprF $ RnZ r z vs
 
 mkZipWith :: Expr0 -> Expr0 -> Expr0 -> Expr0
-mkZipWith l v1 v2 = wrapExprF $ ZipWith l v1 v2
+mkZipWith l v1 v2 = mkZipWithN l [v1,v2]
 
-comp :: Expr0 -> Expr0 -> Expr0
-comp a b = wrapExprF $ Compose a b
+mkZipWithN :: Expr0 -> [Expr0] -> Expr0
+mkZipWithN l vs = wrapExprF $ ZipWithN l vs
 
 defaultStrides :: [Int] -> [Int]
 defaultStrides = tail . scanr (*) 1
 
 isLeafNode :: ExprF a -> Bool
 isLeafNode (Scalar{}) = True
-isLeafNode (VectorView{}) = True
+isLeafNode (View{}) = True
 isLeafNode (Variable{}) = True
 isLeafNode _ = False

@@ -8,7 +8,6 @@ import Parallel
 import Recursion
 import Type
 import Typecheck
-import Control.Arrow ((&&&))
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
 import Data.List (intercalate)
@@ -31,37 +30,33 @@ assignStgAlg :: (NodeId ∈ fields, ParData ∈ fields) => CoAlgebra (Cofree Exp
 assignStgAlg (_ :< Scalar x, s) = makeIdLeaf (show x) s ::< Scalar x
 
 -- It's possible to use the same user data multiple times with different types
-assignStgAlg (r :< VectorView i a b, s) = makeIdLeaf (i ++ "_" ++ show (getNodeId r)) s ::< VectorView i a b
+assignStgAlg (r :< View i a b, s) = makeIdLeaf (i ++ "_" ++ show (getNodeId r)) s ::< View i a b
 
 assignStgAlg (_ :< Variable i t, s) = makeIdLeaf i s ::< Variable i t
 
-assignStgAlg (r :< n@Addition{}, s) = fst (makeId r s) ::< zipExprF n [Nothing, Nothing]
+assignStgAlg (r :< n@ScalarOp{}, s) = fst (makeId r s) ::< zipExprF n [Nothing, Nothing]
 
-assignStgAlg (r :< n@Multiplication{}, s) = fst (makeId r s) ::< zipExprF n [Nothing, Nothing]
-
-assignStgAlg (r :< n@(Apply _ _), s) = result ::< zipExprF n (Just myId:repeat Nothing) where
+assignStgAlg (r :< n@Apply{}, s) = result ::< zipExprF n (Just myId:repeat Nothing) where
     (result, myId) = makeId r s
 
-assignStgAlg (r :< Let n v e, s) = result ::< Let n (v,Nothing) (e, Just myId) where
+assignStgAlg (r :< Lambda vs bs a, s) = result ::< Lambda vs (map (fmap (,Nothing)) bs) (a, Just myId) where
     (result, myId) = makeId r s
 
-assignStgAlg (r :< Lambda v a, s) = result ::< Lambda v (a, Just myId) where
+assignStgAlg (r :< RnZ a b c, s) = result ::< RnZ (a,Just myId) (b,Just $ tmpId) (map (,Nothing) c) where
     (result, myId) = makeId r s
-
-assignStgAlg (r :< Map a b, s) = result ::< Map (a,Just (myId ++ idx)) (b,Nothing) where
-    (result, myId) = makeId r s
-    idx = "[" ++ makeHofIdx r ++ "]"
-
-assignStgAlg (r :< Reduce a b, s) = result ::< Reduce (a,Just myId) (b,Nothing) where
-    (result, myId) = makeId r s
+    tmpId = "tmp_" ++ show (getNodeId r)
     -- (s'@(Std x), [g',g2]) = assignHelper s 2
     -- (y, g1) = next g'
     -- mkResult (snd . getParData -> Just _) = WithTmp (x,Prealloc y)
     -- mkResult (snd . getParData -> Nothing) = s'
 
-assignStgAlg (r :< ZipWith a b c, s) = result ::< ZipWith (a,Just (myId ++ idx)) (b,Nothing) (c,Nothing) where
+assignStgAlg (r :< ZipWithN a b, s) = result ::< ZipWithN (a,Just (myId ++ idx)) (map (,Nothing) b) where
     (result, myId) = makeId r s
-    idx = "[idx_" ++ show (getNodeId r) ++ "]"
+    idx = "[" ++ makeHofIdx r ++ "]"
+
+assignStgAlg (r :< Flip a b, s) = fst (makeId r s) ::< Flip a (b,Nothing)
+
+assignStgAlg (r :< Subdiv a b c, s) = fst (makeId r s) ::< Subdiv a b (c,Nothing)
 
 makeId :: NodeId ∈ fields => R fields -> Maybe String -> (Result, String)
 makeId (getNodeId -> nodeId) inherit = (Std (myId, isNothing inherit), myId) where
@@ -90,7 +85,7 @@ viewType m@(d,_) tn ptrType = ("View<" ++ ptrType ++ ",double" ++ dims d tn ++ "
 newtype ResultPack = ResultPack ([ResultStg], [BigVector]) deriving Show -- collect vecView dimensions to allocate buffers for user data
 data ResultStg = ResultStg { getName :: String, getThreadNum :: Int, getMem :: MemStruct } deriving (Eq, Show, Ord)
 data BigVector = BigVector { getName :: String, getDataId :: String, getMem :: MemStruct } deriving (Eq, Show, Ord)
-type MemStruct = ([Int], [Int])
+type MemStruct = ([Int], [Int]) -- (extents, strides)
 
 defaultMem :: TypecheckT ∈ fields => R (fields) -> MemStruct
 defaultMem (countDims . getType -> ds) = (ds, defaultStrides ds)
@@ -107,17 +102,32 @@ instance Monoid ResultPack where
     mappend (ResultPack (a, b)) (ResultPack (c, d)) = ResultPack (a ++ c, b ++ d)
     mempty = ResultPack ([], [])
 
-collectStgAlg :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
+collectStgAlg :: (NodeId ∈ fields, Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
 
-collectStgAlg ((fieldVal -> Std (name,_)) ::< VectorView dataId d s) = ResultPack([], [BigVector name dataId (d,s)])
+collectStgAlg ((fieldVal -> Std (name,_)) ::< View dataId d s) = ResultPack([], [BigVector name dataId (d,s)])
 
+collectStgAlg (r ::< node@RnZ{}) = getStgAndDims r <> ResultPack([tmpResult], []) <> fold node where
+    tmpResult = ResultStg ("tmp_" ++ show (getNodeId r)) (fst $ getParData r) (defaultMem r)
+
+-- The memory layout of Flip and Subdiv is a modified version of their child's
+collectStgAlg (r@(fieldVal -> Std (x,True)) ::< node@(Flip (i,j) (ResultPack ((ResultStg _ _ (m1,m2):_), _)))) =
+    ResultPack ([ResultStg x (fst $ getParData r) (swap i j m1, swap i j m2)], []) <> fold node
+
+collectStgAlg (r@(fieldVal -> Std (x,True)) ::< node@(Subdiv i b (ResultPack ((ResultStg _ _ m:_), _)))) =
+    ResultPack ([ResultStg x (fst $ getParData r) (subdiv i b m)], []) <> fold node
+
+-- Scalar, View and Variable nodes never allocate, but we can't set the Result to const False,
+-- because it indicates whether they should assign.
 collectStgAlg (r ::< node) = (if isLeafNode node then mempty else getStgAndDims r) <> fold node
 
 getStgAndDims :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => R (fields) -> ResultPack
-getStgAndDims r@(fieldVal &&& fst . getParData -> (Std (x,True), t)) = ResultPack ([ResultStg x t (defaultMem r)], [])
-getStgAndDims (fieldVal -> (Std _)) = ResultPack ([], [])
+getStgAndDims r@(fieldVal -> Std (x,True)) = ResultPack ([ResultStg x (fst $ getParData r) (defaultMem r)], [])
+getStgAndDims _ = ResultPack ([], [])
 
-collectStorage :: (Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Expr fields -> Expr (ResultPack ': fields)
+collectStorage :: (NodeId ∈ fields, Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Expr fields -> Expr (ResultPack ': fields)
 collectStorage expr = (rput (Identity $ returnResult <> p) r :< node)  where
     (r@(fieldVal -> p@ResultPack{}) :< node) = cata (annotate collectStgAlg) expr
     returnResult = ResultPack ([ResultStg "result" 1 (defaultMem $ extract expr)],[])
+
+subdiv :: Int -> Int -> ([Int],[Int]) -> ([Int],[Int])
+subdiv i b (e,s) = (take i e ++ [div (e !! i) b, b] ++ drop (i+1) e, take i s ++ [b*(s !! i)] ++ drop i s)

@@ -2,7 +2,7 @@
 
 module CppTemplate where
 
-import Data.Text (Text, init, concat, intercalate, pack)
+import Data.Text (Text, append, init, concat, cons, intercalate, pack, snoc)
 import NeatInterpolation
 import Prelude hiding (init, concat)
 
@@ -10,71 +10,57 @@ assignTemplate :: Text -> Text -> Text
 assignTemplate name value = 
     [text|$name = $value;|]
 
-addTemplate :: Text -> Text -> Text -> Text -> Text -> Text
-addTemplate lhsCode rhsCode result lhsResult rhsResult = 
+scalarOpTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text
+scalarOpTemplate lhsCode rhsCode result lhsResult op rhsResult = 
     [text|
         $lhsCode
         $rhsCode
-        $result = $lhsResult + $rhsResult;
-    |]
-
-mulTemplate :: Text -> Text -> Text -> Text -> Text -> Text
-mulTemplate lhsCode rhsCode result lhsResult rhsResult = 
-    [text|
-        $lhsCode
-        $rhsCode
-        $result = $lhsResult * $rhsResult;
+        $result = $lhsResult $op $rhsResult;
     |]
 
 appTemplate :: [Text] -> Text -> [Text] -> Text
 appTemplate (concat -> evals) lambda (intercalate ", " -> names) = 
     [text|
-        ${evals}
-        ${lambda}($names);
+        $evals
+        $lambda($names);
     |]
 
-letTemplate :: Text -> Text -> Text -> Text -> Text
-letTemplate eval newName valName expr =
-    [text|
-        ${eval}
-        auto $newName = $valName;
-        $expr
-    |]
-
-lambdaTemplate :: [Text] -> Text -> Text
-lambdaTemplate (intercalate ", " -> params) body =
+-- TODO: let bound expressions should allocate with a given name
+lambdaTemplate :: [Text] -> [Text] -> [Text] -> [Text] -> Text -> Text
+lambdaTemplate (intercalate ", " -> params) (concat -> evals) (map (append "auto ") -> names) values body =
+    let assigns = concat $ zipWith assignTemplate names values in
     [text|
         [=]($params){
+            $evals
+            $assigns
             $body
         }
     |]
 
-mapTemplate :: Text -> Text -> Text -> Text -> Text -> Text
-mapTemplate evalVec idx size lambda vecName =
+indexVecs :: [Text] -> Text -> Text
+indexVecs vs (cons '[' . (flip snoc) ']' -> idx) = intercalate "," $ map (`append` idx) vs
+
+rnzTemplate :: [Text] -> Text -> Text -> Text -> Text -> Text -> Text -> [Text] -> Text
+rnzTemplate (concat -> evalVecs) resultId temp idx size reducer zipper vecNames =
+    let indexedVecs = indexVecs vecNames idx in
     [text|
-        $evalVec
+        $evalVecs
         for (int $idx = 0; $idx < $size; ++$idx) {
-            $lambda($vecName[$idx]);
+            $zipper($indexedVecs);
+            if($idx)
+                $reducer($resultId,$temp);
+            else
+                $resultId = $temp;
         }
     |]
 
-reduceTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text
-reduceTemplate evalVec resultId idx size lambda vecName =
+zipWithNTemplate :: [Text] -> Text -> Text -> Text -> [Text] -> Text
+zipWithNTemplate (concat -> evalVecs) idx size lambda vecNames =
+    let indexedVecs = indexVecs vecNames idx in
     [text|
-        $evalVec
-        $resultId = $vecName[0];
-        for (int $idx = 1; $idx < $size; ++$idx) {
-            $lambda($resultId,$vecName[$idx]);
-        }
-    |]
-
-zipWithTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text -> Text
-zipWithTemplate evalVec1 evalVec2 idx size lambda vecName1 vecName2 =
-    [text|
-        $evalVec1
-        $evalVec2
+        $evalVecs
         for (int $idx = 0; $idx < $size; ++$idx) {
-            $lambda($vecName1[$idx],$vecName2[$idx]);
+            $lambda($indexedVecs);
         }
     |]
 
