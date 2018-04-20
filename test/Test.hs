@@ -23,7 +23,7 @@ import System.Process (cwd, createProcess, proc, waitForProcess)
 
 process :: Expr0 -> String -> IO ()
 process test evalId =
-    let tc = cata (annotate typecheckAlg) test in
+    let tc = cata (annotate typecheckAlg) $ makeSymbolsUnique test in
     case fieldVal @TypecheckT $ extract tc of
     (Left _) -> writeFile ("test/kernel/" ++ evalId ++ ".hpp") $
                 cpuCodeGen evalId $

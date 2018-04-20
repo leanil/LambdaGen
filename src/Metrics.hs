@@ -1,12 +1,13 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, GeneralizedNewtypeDeriving, TypeOperators, ViewPatterns #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, GeneralizedNewtypeDeriving, TupleSections, TypeOperators, ViewPatterns #-}
 
 module Metrics where
 
 import Expr
 import Recursion
 import Control.Comonad.Cofree (Cofree(..))
-import Data.Foldable (fold, foldMap)
+import Data.Foldable (fold, foldl', foldMap)
 import Data.Functor.Foldable (ana, cata)
+import Data.Map.Strict (Map, (!), empty, insert)
 import Data.Monoid (Sum(..), (<>))
 import Data.Vinyl (type (∈))
 
@@ -31,3 +32,14 @@ getNodeId (fieldVal -> NodeId x) = x
 
 assignNodeId :: Expr fields -> Expr (NodeId ': SubtreeSize ': fields)
 assignNodeId expr = ana (annotateAna nodeIdAlg) $ (cata (annotate subtreeSizeAlg) expr, 1)
+
+makeSymbolsUnique :: Expr fields -> Expr (NodeId ': SubtreeSize ': fields)
+makeSymbolsUnique = ana alg . (,empty) . assignNodeId where
+    alg :: NodeId ∈ fields => CoAlgebra (Expr fields) (Expr fields,Map String String)
+    alg (r :< Lambda (unzip -> (vs,ts)) (unzip -> (bs,es)) body, m) = r ::< Lambda vars' binds' (body, m') where
+        i = show $ getNodeId r
+        m' = foldl' (\a b -> insert b (b ++ i) a) m (vs ++ bs)
+        vars' = zip (map (++i) vs) ts
+        binds' = zip (map (++i) bs) (map (,m') es)
+    alg (r :< Variable name t, m) = r ::< Variable (m ! name) t
+    alg (r :< node,m) = r ::< zipExprF node (repeat m)

@@ -7,19 +7,19 @@ auto evaluator3(std::map<std::string, double*> userData) {
     View<double*, double, to_list_t<>> result;
     View<double*, double, to_list_t<>> v_6;
     
-    [=](auto x){
+    [=](auto x7){
         
         
         
         
-        v_6 = x + x;
+        v_6 = x7 + x7;
     }(2.0);
-    [=](auto y){
+    [=](auto y2){
         
         
         
         
-        result = y * y;
+        result = y2 * y2;
     }(v_6);
     return result;
 }

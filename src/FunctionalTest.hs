@@ -34,11 +34,8 @@ test3 = (
     "16")
 
 test4 = (
-    let v1 = var "v1" (power double [3])
-        v2 = var "v2" (power double [3]) in
     mkMap
-        (lamBind [v2] [(v1,vecView "vec" [3])]
-                (mkRnZ sclAdd sclMul [v1,v2]))
+        (app (dotProd 3) [vecView "vec" [3]])
         (vecView "mat" [2,3]),
     "{50,122}")
 

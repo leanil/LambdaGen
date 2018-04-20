@@ -33,7 +33,7 @@ process expr =
 
 main :: IO ()
 main = do
-    let tcd = cata (annotate typecheckAlg) test
+    let tcd = cata (annotate typecheckAlg) $ makeSymbolsUnique test
     case fieldVal @TypecheckT $ extract tcd of
         (Left _) -> do
             let rep = replaceAll partialAppPat partialAppRep partialAppConstraint partialAppTransform tcd
