@@ -7,7 +7,9 @@ import FunctionalTest
 import Metrics
 import Parallel
 import Recursion
+import Replace
 import Storage
+import Transformation
 import Typecheck
 import Control.Comonad (extract)
 import Control.Monad (foldM)
@@ -29,7 +31,9 @@ process test evalId =
                 assignStorage $
                 parallelize 4 $
                 assignNodeId $
-                cata constFoldAlg tc
+                cata constFoldAlg $
+                cata (annotate typecheckAlg) $
+                replaceAll partialAppPat partialAppRep partialAppConstraint partialAppTransform tc
 
     (Right errors) -> print errors
 

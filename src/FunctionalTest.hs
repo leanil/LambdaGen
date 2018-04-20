@@ -93,5 +93,4 @@ test11 = (
     "{4,6,8}")
 
 funcTests :: [Test]
---funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11]
-funcTests = [test1, test2, test3, test4, test9]
+funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11]

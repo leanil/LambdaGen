@@ -72,7 +72,7 @@ public:
 
     static constexpr int size = D::dim;
 
-    View<Ptr, T, List<D, Ds>>& operator=(const View<Ptr, T, List<D, Ds>>& other) const {
+    View<Ptr, T, List<D, Ds>>& operator=(const View<Ptr, T, List<D, Ds>>& other) {
         for (int i = 0; i < D::dim; ++i) {
             (*this)[i] = other[i];
         }

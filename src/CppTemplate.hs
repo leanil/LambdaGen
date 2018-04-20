@@ -25,7 +25,7 @@ appTemplate (concat -> evals) lambda (intercalate ", " -> names) =
         $lambda($names);
     |]
 
--- TODO: let bound expressions should allocate with a given name
+-- TODO: let-bound expressions should allocate with a given name
 lambdaTemplate :: [Text] -> [Text] -> [Text] -> [Text] -> Text -> Text
 lambdaTemplate (intercalate ", " -> params) (concat -> evals) (map (append "auto ") -> names) values body =
     let assigns = concat $ zipWith assignTemplate names values in

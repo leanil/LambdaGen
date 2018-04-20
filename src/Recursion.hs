@@ -12,6 +12,7 @@ import Data.Vinyl
 import Data.Vinyl.Functor 
 
 type CofreeF = CofreeT.CofreeF
+pattern (::<) :: a -> f b -> CofreeF f a b
 pattern a ::< b = a CofreeT.:< b
 type R = HList
 

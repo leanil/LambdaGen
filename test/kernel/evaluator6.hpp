@@ -3,25 +3,35 @@
 #include <string>
 
 auto evaluator6(std::map<std::string, double*> userData) {
-    View<double const*, double, to_list_t<P<3,1>>> a_11(userData["a"]);
-    View<double const*, double, to_list_t<P<3,1>>> b_12(userData["b"]);
-    View<double*, double, to_list_t<P<3,1>>> result;
-    View<double*, double, to_list_t<P<3,1>>> v_6;
+    View<double const*, double, to_list_t<P<3,1>>> a_17(userData["a"]);
+    View<double const*, double, to_list_t<P<3,1>>> b_18(userData["b"]);
+    View<double*, double, to_list_t<P<3,3>, P<3,1>>> result;
     
-    for (int idx_6 = 0; idx_6 < 3; ++idx_6) {
-        [=](auto x){
-            
-            
-            v_6[idx_6] = 3.0 * x;
-        }(a_11[idx_6]);
-    }
-    
-    for (int idx_1 = 0; idx_1 < 3; ++idx_1) {
-        [=](auto x, auto y){
-            
-            
-            result[idx_1] = x + y;
-        }(v_6[idx_1],b_12[idx_1]);
-    }
+    [=](auto v1, auto v2){
+        
+        
+        
+        for (int idx_3 = 0; idx_3 < 3; ++idx_3) {
+            [=](auto x){
+                
+                
+                
+                [=](auto x, auto v){
+                    
+                    
+                    
+                    for (int idx_7 = 0; idx_7 < 3; ++idx_7) {
+                        [=](auto y){
+                            
+                            auto x1 = x;
+                            
+                            
+                            result[idx_3][idx_7] = x1 * y;
+                        }(v[idx_7]);
+                    }
+                }(x, v2);
+            }(v1[idx_3]);
+        }
+    }(a_17, b_18);
     return result;
 }

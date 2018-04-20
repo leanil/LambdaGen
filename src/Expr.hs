@@ -16,8 +16,8 @@ data ExprF a
     | Variable { getName :: String, getVarType :: Type }
     | RnZ { getReducer :: a, getZipper :: a, getVecs :: [a] }
     | ZipWithN { getLambda :: a, getVecs :: [a] }
-    | Flip { getDims :: (Int,Int), getExpr :: a }
-    | Subdiv { getDim :: Int, getBlockSize :: Int, getExpr :: a }
+    | Flip { getDims :: (Int,Int), getBaseExpr :: a }
+    | Subdiv { getDim :: Int, getBlockSize :: Int, getBaseExpr :: a }
     deriving (Functor, Foldable, Traversable, Show)
 
 castLeaf :: ExprF a -> ExprF b

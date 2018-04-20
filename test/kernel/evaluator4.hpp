@@ -14,12 +14,12 @@ auto evaluator4(std::map<std::string, double*> userData) {
             auto v1 = vec_3;
             
             for (int idx_4 = 0; idx_4 < 3; ++idx_4) {
-                [=](auto x, auto y){
+                [=](auto x1, auto y){
                     
                     
                     
                     
-                    tmp_4 = x * y;
+                    tmp_4 = x1 * y;
                 }(v1[idx_4],v2[idx_4]);
                 if(idx_4)
                     [=](auto x, auto y){

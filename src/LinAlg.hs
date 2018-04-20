@@ -9,7 +9,7 @@ sclAdd = let x = var "x" double
          in  lam [x,y] (add x y)
 
 sclMul :: Expr0
-sclMul = let x = var "x" double
+sclMul = let x = var "x1" double
              y = var "y" double
          in  lam [x,y] (mul x y)
 
