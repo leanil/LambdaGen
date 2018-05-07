@@ -14,7 +14,7 @@ m3 = m1 + m2;
 ```
 However, when the same nodes inherit their target memory, they have to explicitly set that memory to their
 value at evaluation, so we need to generate code for an assignment. For example in the identity function
-`lam [var "x" double] (var "x" double)` the `var` node in the body obviously has to generate some, so the whole construct becomes
+`lam [var "x" double] (var "x" double)` the `var` node in the body obviously has to generate some code, so the whole construct becomes
 ```cpp
 [=](auto x) {
     m1 = x;

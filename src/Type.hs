@@ -9,13 +9,13 @@ import Data.List (intercalate)
 
 data TypeF a
     = Double
-    | Power { getBase :: a, getExtents :: [Int] }
+    | Power { getBase :: a, getDims :: [(Int,Int)] }
     | Arrow { from :: [a], to :: a }
     deriving (Eq, Show, Functor)
 
 instance Eq1 TypeF where
     liftEq _ Double Double = True
-    liftEq eq (Power a b) (Power c d) = eq a c && b == d
+    liftEq eq (Power a b) (Power c d) = eq a c && (map fst b) == (map fst d)
     liftEq eq (Arrow a b) (Arrow c d) = and (zipWith eq a c) && eq b d
     liftEq _ _ _ = False
 
@@ -30,7 +30,10 @@ double :: Type
 double = Fix Double
 
 power :: Type -> [Int] -> Type
-power x y = Fix $ Power x y
+power x y = power' x $ zip y $ tail $ scanr (*) 1 y
+
+power' :: Type -> [(Int,Int)] -> Type
+power' x y = Fix $ Power x y
 
 arrow :: [Type] -> Type -> Type
 arrow x y = Fix $ Arrow x y
@@ -47,11 +50,6 @@ typePrinterAlg (Arrow a b) = "(" ++ intercalate " " a ++ ")->(" ++ b ++ ")"
 showT :: Type -> String
 showT = cata typePrinterAlg
 
-countDims :: Type -> [Int]
-countDims FDouble = [1]
-countDims (FPower _ d) = d
-countDims _ = []
-
 raiseToPower :: Type -> Int -> Type
-raiseToPower (FPower t b) a = power t (a:b)
+raiseToPower (FPower t b@((d,s):_)) a = power' t ((a,d*s):b)
 raiseToPower t a = power t [a]

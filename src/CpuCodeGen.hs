@@ -18,14 +18,14 @@ import Data.Vinyl
 newtype CpuCodeT = CpuCodeT Text deriving Show
 cpuCodeGenAlg :: (NodeId ∈ fields, Result ∈ fields, NodeId ∈ fields, TypecheckT ∈ fields) => RAlgebra (Expr fields) CpuCodeT
 
-cpuCodeGenAlg ((fieldVal -> Std (_,True)) ::< Scalar{}) = CpuCodeT ""
-cpuCodeGenAlg ((fieldVal -> Std (mem,_)) ::< Scalar x) = CpuCodeT $ assignTemplate (pack mem) (pack (show x))
+cpuCodeGenAlg ((fieldVal -> Std _ False _) ::< Scalar{}) = CpuCodeT ""
+cpuCodeGenAlg ((fieldVal -> Std mem True _) ::< Scalar x) = CpuCodeT $ assignTemplate (pack mem) (pack (show x))
 
-cpuCodeGenAlg ((fieldVal -> Std (_,True)) ::< View{}) = CpuCodeT ""
-cpuCodeGenAlg ((fieldVal -> Std (mem,_)) ::< View name _ _) = CpuCodeT $ assignTemplate (pack mem) (pack name)
+cpuCodeGenAlg ((fieldVal -> Std _ False _) ::< View{}) = CpuCodeT ""
+cpuCodeGenAlg ((fieldVal -> Std mem True _) ::< View name _ _) = CpuCodeT $ assignTemplate (pack mem) (pack name)
 
-cpuCodeGenAlg ((fieldVal -> Std (_,True)) ::< Variable{}) = CpuCodeT ""
-cpuCodeGenAlg ((fieldVal -> Std (mem,_)) ::< Variable name _) = CpuCodeT $ assignTemplate (pack mem) (pack name)
+cpuCodeGenAlg ((fieldVal -> Std _ False _) ::< Variable{}) = CpuCodeT ""
+cpuCodeGenAlg ((fieldVal -> Std mem True _) ::< Variable name _) = CpuCodeT $ assignTemplate (pack mem) (pack name)
 
 cpuCodeGenAlg (r ::< ScalarOp op (ra :< _,CpuCodeT a) (rb :< _,CpuCodeT b)) =
     CpuCodeT $ scalarOpTemplate a b (getResultId r) (getResultId ra) (singleton op) (getResultId rb)
@@ -46,11 +46,23 @@ cpuCodeGenAlg (r ::< RnZ (_,CpuCodeT a) (_,CpuCodeT b) vs@(unzipCodes -> (evals,
 cpuCodeGenAlg (r ::< ZipWithN (_,CpuCodeT a) vs@(unzipCodes -> (evals,names))) =
     CpuCodeT $ zipWithNTemplate evals (pack $ makeHofIdx r) (pack $ show $ getVecSize vs) a names
 
+cpuCodeGenAlg (r ::< Flip (i,j) (ra :< _,CpuCodeT a)) =
+    CpuCodeT $ flipTemplate a auto (getResultId r) (pack $ show i) (pack $ show j) (getResultId ra) where
+        auto = case fieldVal r of
+            Std _ True _ -> ""
+            Std _ False _ -> "auto "
+
+cpuCodeGenAlg (r ::< Subdiv i b (ra :< _,CpuCodeT a)) =
+    CpuCodeT $ subdivTemplate a auto (getResultId r) (pack $ show i) (pack $ show b) (getResultId ra) where
+        auto = case fieldVal r of
+            Std _ True _ -> ""
+            Std _ False _ -> "auto "
+
 unzipCodes :: Result ∈ fields => [(Expr fields,CpuCodeT)] -> ([Text],[Text])
 unzipCodes = unzip . map (\(r :< _,CpuCodeT a) -> (a,getResultId r))
 
 getVecSize :: TypecheckT ∈ fields => [(Expr fields,a)] -> Int
-getVecSize (((getType -> FPower _ (s:_)) :< _,_):_) = s
+getVecSize (((getType -> FPower _ ((s,_):_)) :< _,_):_) = s
 
 cpuCodeGen :: (NodeId ∈ fields, Result ∈ fields, ResultPack ∈ fields, NodeId ∈ fields, TypecheckT ∈ fields) => 
     String -> Expr fields -> String
@@ -70,4 +82,4 @@ withNL [] = []
 withNL s  = s ++ ",\n"
 
 getResultId :: Result ∈ fields => R fields -> Text
-getResultId (fieldVal -> Std (resultId,_)) = pack resultId
+getResultId (fieldVal -> Std resultId _ _) = pack resultId

@@ -64,6 +64,20 @@ zipWithNTemplate (concat -> evalVecs) idx size lambda vecNames =
         }
     |]
 
+flipTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text
+flipTemplate rhsCode auto result idx1 idx2 rhsResult =
+    [text|
+        $rhsCode
+        $auto$result = flip<$idx1>($rhsResult);
+    |]
+
+subdivTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text
+subdivTemplate rhsCode auto result idx block rhsResult =
+    [text|
+        $rhsCode
+        $auto$result = subdiv<$idx,$block>($rhsResult);
+    |]
+
 viewDimElemTemplate :: (Int, Int) -> Text
 viewDimElemTemplate (1,1) = ""
 viewDimElemTemplate (pack . show -> size, pack . show -> stride) =

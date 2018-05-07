@@ -3,13 +3,17 @@
 module Typecheck where
 
 import Expr
+import Print
 import Recursion
 import Type
+import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree)
 import Data.Either (lefts)
+import Data.Functor.Foldable (cata)
 import Data.List (intercalate, nub)
 import Data.Maybe (catMaybes, mapMaybe)
-import Data.Vinyl
+import Data.Proxy (Proxy(Proxy))
+import Data.Vinyl (type (∈))
 
 type Error = String
 type TypecheckT = Either Type [Error]
@@ -17,7 +21,7 @@ type TypecheckT = Either Type [Error]
 allLeft :: [TypecheckT] -> Maybe [Type]
 allLeft x = let l = lefts x in if length l == length x then Just l else Nothing
 
-typecheckAlg :: Algebra (Cofree ExprF (R fields)) TypecheckT
+typecheckAlg :: Algebra (Expr fields) TypecheckT
 
 typecheckAlg (_ ::< Scalar _) = Left double
 
@@ -45,15 +49,28 @@ typecheckAlg (_ ::< ZipWithN (Left (FArrow a b)) (allLeft -> Just c)) =
 typecheckAlg (_ ::< ZipWithN (Left a) (allLeft -> Just b)) = Right $ catMaybes [biLambdaCheck a, eqVectorCheck b]   
 
 typecheckAlg (_ ::< Flip (i,j) (Left (FPower a b)))
-    | min i j >= 0 && max i j < length b = Left $ power a (swap i j b)
+    | min i j >= 0 && max i j < length b = Left $ power' a (swap i j b)
     | otherwise = Right ["flip index out of range"]
 
 typecheckAlg (_ ::< Subdiv i block (Left (FPower a b)))
     | i < 0 || i >= length b = Right ["subdiv index out of range"]
-    | mod (b !! i) block /= 0 = Right ["subdiv block size incompatible"]
-    | otherwise = Left $ power a $ take i b ++ [div (b !! i) block, block] ++ drop (i+1) b
+    | mod (fst $ b !! i) block /= 0 = Right ["subdiv block size incompatible"]
+    | otherwise = Left $ power' a $ 
+                  take i b ++ [(div (fst $ b !! i) block, block*(snd $ b !! i)), (block,snd $ b !! i)] ++ drop (i+1) b
 
 typecheckAlg (_ ::< node) = Right $ foldMap (either (const []) id) node
+
+typecheck :: Expr fields -> Either Error (Expr (TypecheckT ': fields))
+typecheck (cata (annotate typecheckAlg) -> expr) = 
+    case fieldVal @TypecheckT $ extract expr of
+        (Left _) -> Right expr
+        (Right err) -> Left $ intercalate "\n" err ++ "\n\n" ++ printExpr (Proxy :: Proxy (R '[TypecheckT])) expr
+
+typecheck' :: Expr fields -> Expr (TypecheckT ': fields)
+typecheck' (cata (annotate typecheckAlg) -> expr) = 
+    case fieldVal @TypecheckT $ extract expr of
+        (Left _) -> expr
+        (Right err) -> error $ intercalate "\n" err ++ "\n\n" ++ printExpr (Proxy :: Proxy (R '[TypecheckT])) expr
 
 swap :: Int -> Int -> [a] -> [a]
 swap i j xs = [get k x | (k, x) <- zip [0..] xs]
@@ -88,11 +105,11 @@ eqVectorCheck (nub . map fstDim -> [s]) | s > 0 = Nothing
 eqVectorCheck a = Just $ show a ++ " sould be a non-empty list of equal sized (non-empy) vectors"
 
 fstDim :: Type -> Int
-fstDim (FPower _ (x:_)) = x
+fstDim (FPower _ ((x,_):_)) = x
 fstDim _ = -1
 
 elemType :: Type -> Type
-elemType (FPower a b@(_:_:_)) = power a (tail b)
+elemType (FPower a b@(_:_:_)) = power' a (tail b)
 elemType (FPower a [_]) = a
 
 varMatchCheck :: [Type] -> [Type] -> Maybe Error

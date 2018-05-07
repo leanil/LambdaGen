@@ -9,6 +9,8 @@
 #include "evaluator9.hpp"
 #include "evaluator10.hpp"
 #include "evaluator11.hpp"
+#include "evaluator12.hpp"
+#include "evaluator13.hpp"
 #include "tester.hpp"
 #include <cstdlib>
 
@@ -19,7 +21,9 @@ int main(int argc, char** argv) {
         { "a", gen_seq(1,3) },
         { "b", gen_seq(1,3) },
         { "mat8", gen_seq(1,8) },
-        { "tens", gen_seq(1,24) }
+        { "tens", gen_seq(1,24) },
+        { "M1", gen_seq(1,6) },
+        { "M2", gen_seq(7,12) }
     };
     switch (atoi(argv[1])) {
     case 1: return check(evaluator1(bigVectors), "20");
@@ -33,6 +37,8 @@ int main(int argc, char** argv) {
     case 9: return check(evaluator9(bigVectors), "{4,8,12}");
     case 10: return check(evaluator10(bigVectors), "{3,3,3}");
     case 11: return check(evaluator11(bigVectors), "{4,6,8}");
+    case 12: return check(evaluator12(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
+    case 13: return check(evaluator13(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
     default: return 1;
     }
 }

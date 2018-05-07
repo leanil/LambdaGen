@@ -6,6 +6,9 @@ import Expr
 import LinAlg
 import Type
 import Data.Text (Text)
+import Replace
+import Transformation
+import Typecheck
 
 x,y,a,b :: Expr0
 x = var "x" double
@@ -89,5 +92,23 @@ test11 = (
             a),
     "{4,6,8}")
 
+matMatMul, zzSwap :: Test
+matMatMul = (
+    let u = var "u" (power double [3])
+        v = var "v" (power double [3]) in
+    mkMap
+        (lam [u]
+            (mkMap
+                (lam [v]
+                    (mkRnZ sclAdd sclMul [u,v]))
+                (vecView "M1" [2,3])))
+        (mkFlip (0,1) (vecView "M2" [3,4])),
+    "{{74,173},{80,188},{86,203},{92,218}}")
+
+zzSwap = mapFst (replace1TopDown zipZipSwap zipZipSwapTrans . typecheck') matMatMul
+
 funcTests :: [Test]
-funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11]
+funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, matMatMul, zzSwap]
+
+mapFst :: (a -> b) -> (a,c) -> (b,c)
+mapFst f (p,q) = (f p, q)

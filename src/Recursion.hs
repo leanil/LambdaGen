@@ -37,3 +37,6 @@ annotateAna alg a@(old :< _,_) = (Identity (headF tmp) :& old) ::< tailF tmp whe
 
 fieldVal :: a ∈ fields => R fields -> a
 fieldVal = getIdentity . rget (Proxy :: Proxy a)
+
+getAnnot :: Cofree f a -> a
+getAnnot (a :< _) = a

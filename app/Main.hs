@@ -20,7 +20,7 @@ import Data.Proxy (Proxy(Proxy))
 import Data.Vinyl
 
 test :: Expr0
-test = fst test5
+test = fst zzSwap
 
 process :: TypecheckT ∈ fields => Expr fields -> 
     Expr (ResultPack ': Result ': ParData ': NodeId ': SubtreeSize ': fields)
@@ -36,11 +36,17 @@ main = do
     let tcd = cata (annotate typecheckAlg) $ makeSymbolsUnique test
     case fieldVal @TypecheckT $ extract tcd of
         (Left _) -> do
-            let rep = replaceAll partialAppPat partialAppRep partialAppConstraint partialAppTransform tcd
+            let rep = replaceAll partialApp partialAppTrans tcd
+            --let rep' = replace1TopDown zipZipSwap zipZipSwapTrans tcd
             let recheck = cata (annotate typecheckAlg) rep
-            let prd = process recheck
-            writeFile "../test/result.hpp" $ cpuCodeGen "eval" prd
-            putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT, ParData, Result])) prd
+            case fieldVal @TypecheckT $ extract recheck of
+                (Left _) -> do
+                    let prd = process recheck
+                    writeFile "../test/result.hpp" $ cpuCodeGen "eval" prd
+                    putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) prd
+                (Right errors) ->
+                    putStr $ intercalate "\n" errors ++ "\n\n" ++
+                    printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd
         (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
             printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd

@@ -13,47 +13,47 @@ struct P {
     static constexpr int stride = S;
 };
 
-//template<int D, int L, typename S> struct Subdiv;
-//
-//template<int D, int L, typename H, typename T>
-//struct Subdiv<D, L, List<H, T>> {
-//    using type = List<H, typename Subdiv<D - 1, L, T>::type>;
-//};
-//
-//template<int L, int D, int S, typename T>
-//struct Subdiv<0, L, List<P<D, S>, T>> {
-//    using type = List<P<L, D / L*S>, List<P<D / L, S>, T>>;
-//};
-//
-//template<int D, int L, typename S>
-//using subdiv_t = typename Subdiv<D, L, S>::type;
-//
-//template<int D, typename S> struct Flip;
-//
-//template<int D, typename H, typename T>
-//struct Flip<D, List<H, T>> {
-//    using type = List<H, typename Flip<D - 1, T>::type>;
-//};
-//
-//template<typename A, typename B, typename T>
-//struct Flip<0, List<A, List<B, T>>> {
-//    using type = List<B, List<A, T>>;
-//};
-//
-//template<int D, typename S>
-//using flip_t = typename Flip<D, S>::type;
-//
+template<int I, int B, typename S> struct Subdiv;
+
+template<int I, int B, typename H, typename T>
+struct Subdiv<I, B, List<H, T>> {
+    using type = List<H, typename Subdiv<I - 1, B, T>::type>;
+};
+
+template<int B, int D, int S, typename T>
+struct Subdiv<0, B, List<P<D, S>, T>> {
+    using type = List<P<D/B, B*S>, List<P<B, S>, T>>;
+};
+
+template<int I, int B, typename S>
+using subdiv_t = typename Subdiv<I, B, S>::type;
+
+template<int D, typename S> struct Flip;
+
+template<int D, typename H, typename T>
+struct Flip<D, List<H, T>> {
+    using type = List<H, typename Flip<D - 1, T>::type>;
+};
+
+template<typename A, typename B, typename T>
+struct Flip<0, List<A, List<B, T>>> {
+    using type = List<B, List<A, T>>;
+};
+
+template<int D, typename S>
+using flip_t = typename Flip<D, S>::type;
+
 template<typename Ptr, typename T, typename Ds> class View;
-//
-//template<int d, typename Ptr, typename T, typename Ds>
-//auto flip(View<Ptr, T, Ds> v) {
-//    return View<Ptr, T, flip_t<d, Ds>>(v.data);
-//}
-//
-//template<int d, int l, typename Ptr, typename T, typename Ds>
-//auto subdiv(View<Ptr, T, Ds> v) {
-//    return View<Ptr, T, subdiv_t<d, l, Ds>>(v.data);
-//}
+
+template<int d, typename Ptr, typename T, typename Ds>
+auto flip(View<Ptr, T, Ds> v) {
+    return View<Ptr, T, flip_t<d, Ds>>(v.data);
+}
+
+template<int i, int b, typename Ptr, typename T, typename Ds>
+auto subdiv(View<Ptr, T, Ds> v) {
+    return View<Ptr, T, subdiv_t<i, b, Ds>>(v.data);
+}
 
 template<typename L>
 struct ViewSize {

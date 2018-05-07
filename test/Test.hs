@@ -33,7 +33,7 @@ process test evalId =
                 assignNodeId $
                 cata constFoldAlg $
                 cata (annotate typecheckAlg) $
-                replaceAll partialAppPat partialAppRep partialAppConstraint partialAppTransform tc
+                replaceAll partialApp partialAppTrans tc
 
     (Right errors) -> print errors
 
@@ -72,7 +72,9 @@ testCode includeText switchText =
                 { "a", gen_seq(1,3) },
                 { "b", gen_seq(1,3) },
                 { "mat8", gen_seq(1,8) },
-                { "tens", gen_seq(1,24) }
+                { "tens", gen_seq(1,24) },
+                { "M1", gen_seq(1,6) },
+                { "M2", gen_seq(7,12) }
             };
             switch (atoi(argv[1])) {
             $switchText
