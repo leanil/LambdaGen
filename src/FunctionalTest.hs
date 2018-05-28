@@ -9,6 +9,7 @@ import Data.Text (Text)
 import Replace
 import Transformation
 import Typecheck
+import Utility (mapFst)
 
 x,y,a,b :: Expr0
 x = var "x" double
@@ -92,7 +93,7 @@ test11 = (
             a),
     "{4,6,8}")
 
-matMatMul, zzSwap :: Test
+matMatMul, zzSwap, zrSwap :: Test
 matMatMul = (
     let u = var "u" (power double [3])
         v = var "v" (power double [3]) in
@@ -107,8 +108,7 @@ matMatMul = (
 
 zzSwap = mapFst (replace1TopDown zipZipSwap zipZipSwapTrans . typecheck') matMatMul
 
-funcTests :: [Test]
-funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, matMatMul, zzSwap]
+zrSwap = mapFst (replace1TopDown zipRnZSwap zipRnZSwapTrans . typecheck') matMatMul
 
-mapFst :: (a -> b) -> (a,c) -> (b,c)
-mapFst f (p,q) = (f p, q)
+funcTests :: [Test]
+funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, matMatMul, zzSwap, zrSwap]

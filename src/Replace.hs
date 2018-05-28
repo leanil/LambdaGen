@@ -4,9 +4,11 @@ module Replace where
 
 import Expr
 import Recursion
+import Control.Arrow ((&&&))
 import Control.Comonad.Cofree (Cofree ((:<)), unwrap)
 import Data.Functor.Foldable
-import qualified Data.Map.Strict as M
+import Data.Map.Strict (Map, (!), findWithDefault, insert, union, singleton)
+import Data.Maybe (fromJust)
 import Data.Vinyl
 
 data PExprF a
@@ -18,8 +20,8 @@ data PExprF a
     | PVariable String
     | PRnZ String a a
     | PZipWithN String a
-    | PFlip String (Int,Int) a
-    | PSubdiv String Int Int a
+    | PFlip String a
+    | PSubdiv String a
     | PStar String
     deriving (Eq, Functor, Show)
 
@@ -35,54 +37,84 @@ pattern MLam n a        = Fix (PLambda n a)
 pattern MVar n          = Fix (PVariable n)
 pattern MRnZ n red zip  = Fix (PRnZ n red zip)
 pattern MZipWithN n lam = Fix (PZipWithN n lam)
-pattern MFlip n a b     = Fix (PFlip n a b)
-pattern MSubdiv n a b c = Fix (PSubdiv n a b c)
+pattern MFlip n a       = Fix (PFlip n a)
+pattern MSubdiv n a     = Fix (PSubdiv n a)
 pattern MStar id        = Fix (PStar id)
+
+type ExprOpt fields = Cofree ExprF (Maybe (R fields))
+
+data MatchVal fields
+    = Subtree { getSubtree  :: ExprOpt fields }
+    | Args { getArgList  :: [ExprOpt fields] }
+    | Node { getInfo :: Maybe (R fields), getNode  :: ExprF () }
+
+instance Show (MatchVal fields) where
+    show (Subtree (_ :< a)) = "Subtree " ++ show (fmap (const ()) a)
+    show (Args a) = "Args " ++ show (map (fmap (const ()) . unwrap) a)
+    show (Node _ a) = "Node " ++ show a
     
-type Match fields = M.Map String (Expr fields)
+type Match fields = Map String (MatchVal fields)
 
-mGetExpr :: Ord k => M.Map k (Expr fields) -> k -> Expr fields
-mGetExpr match key = match M.! key
+mGetSubtree :: Match fields -> String -> ExprOpt fields
+mGetSubtree match = getSubtree . (match !)
 
-mGetNode :: Ord k => M.Map k (Expr fields) -> k -> ExprF (Expr fields)
-mGetNode match key = unwrap $ match M.! key
+mGetArgList :: Match fields -> String -> [ExprOpt fields]
+mGetArgList match key = getArgList $ match ! (key ++ "__args")
+
+mGetNode :: Match fields -> String -> ExprF ()
+mGetNode match = getNode . (match !)
+
+getAnnotedNode :: Match fields -> String -> (R fields ,ExprF ())
+getAnnotedNode match = ((fromJust . getInfo) &&& getNode) . (match !)
+
+saveNode :: String -> Expr fields -> Match fields
+saveNode key (info :< node) = singleton key $ Node (Just info) (fmap (const ()) node)
+
+saveWithArgs :: String -> Expr fields -> [Expr fields] -> Match fields
+saveWithArgs key expr args = insert (key ++ "__args") (Args $ map makeAnnotationOptional args) (saveNode key expr)
+
+makeAnnotationOptional :: Expr fields -> ExprOpt fields
+makeAnnotationOptional = cata (\(info ::< node) -> (Just info :< node))
 
 makeComp :: (Expr fields, PExpr) -> Either (Maybe (Match fields)) (CofreeF ExprF (Match fields) (Expr fields, PExpr))
-makeComp (n@(_ :< m@Scalar{}), MScl i)                          = Right $ M.singleton i n ::< castLeaf m
-makeComp (n@(_ :< m@(ScalarOp a _ _)), MSclOp i b c d) | a == b = Right $ M.singleton i n ::< zipExprF m [c,d]
-makeComp (n@(_ :< m@View{}), MView i)                           = Right $ M.singleton i n ::< castLeaf m
-makeComp (n@(_ :< m@Apply{}), MApp i a)                         = Right $ M.singleton i n ::< zipExprF m [a]
-makeComp (n@(_ :< (Lambda _ _ a)), MLam i b)                    = Right $ M.singleton i n ::< Lambda [] [] (a,b)
-makeComp (n@(_ :< m@Variable{}), MVar i)                        = Right $ M.singleton i n ::< castLeaf m
-makeComp (n@(_ :< m@RnZ{}), MRnZ i a b)                         = Right $ M.singleton i n ::< zipExprF m [a,b]
-makeComp (n@(_ :< m@ZipWithN{}), MZipWithN i a)                 = Right $ M.singleton i n ::< zipExprF m [a]
-makeComp (n@(_ :< m@Flip{}), MFlip i _ a)                       = Right $ M.singleton i n ::< zipExprF m [a]
-makeComp (n@(_ :< m@Subdiv{}), MSubdiv i _ _ a)                 = Right $ M.singleton i n ::< zipExprF m [a]
-makeComp (subTree, MStar i)                                     = Left $ Just $ M.singleton i subTree
+-- NOTE: save plain nodes as well, because we may need their annotation
+makeComp (n@(_ :< m@(ScalarOp a _ _)), MSclOp i b c d) | a == b = Right $ saveNode i n ::< zipExprF m [c,d]
+makeComp (n@(_ :< m@Flip{}), MFlip i a)                         = Right $ saveNode i n ::< zipExprF m [a]
+makeComp (n@(_ :< m@Subdiv{}), MSubdiv i a)                     = Right $ saveNode i n ::< zipExprF m [a]
+makeComp (n@(_ :< m@Scalar{}), MScl i)                          = Right $ saveNode i n ::< castLeaf m
+makeComp (n@(_ :< m@View{}), MView i)                           = Right $ saveNode i n ::< castLeaf m
+makeComp (n@(_ :< m@Variable{}), MVar i)                        = Right $ saveNode i n ::< castLeaf m
+makeComp (n@(_ :< m@(Apply _ args)), MApp i a)                  = Right $ saveWithArgs i n args ::< zipExprF m [a]
+makeComp (n@(_ :< (Lambda _ binds a)), MLam i b)                = Right $ saveWithArgs i n (map snd binds) ::< Lambda [] [] (a,b)
+makeComp (n@(_ :< m@(RnZ _ _ args)), MRnZ i a b)                = Right $ saveWithArgs i n args ::< zipExprF m [a,b]
+makeComp (n@(_ :< m@(ZipWithN _ args)), MZipWithN i a)          = Right $ saveWithArgs i n args ::< zipExprF m [a]
+makeComp (subTree, MStar i)                                     = Left $ Just $ singleton i $ Subtree $ makeAnnotationOptional subTree
 makeComp _                                                      = Left Nothing
   
 evalComp :: CofreeF ExprF (Match fields) (Maybe (Match fields)) -> Maybe (Match fields)
 evalComp (m ::< node) = foldr maybeUnion (Just m) node where
-    maybeUnion (Just a) (Just b) = Just $ M.union a b
+    maybeUnion (Just a) (Just b) = Just $ union a b
     maybeUnion _ _ = Nothing
     
-stripExpr :: Expr fields -> ExprF Expr0
-stripExpr = unwrap . cata (\(_ ::< node) -> (RNil :< node))
+stripExpr :: Cofree ExprF a -> Expr0
+stripExpr = cata (\(_ ::< node) -> (RNil :< node))
 
 fillReplacement :: Match fields -> PExpr -> Expr0
 fillReplacement match = cata alg where
     alg :: Algebra PExpr Expr0
     alg (PScalar n)         = RNil :< castLeaf (mGetNode match n)
-    alg (PScalarOp _ o a b) = RNil :< ScalarOp o a b
     alg (PView n)           = RNil :< castLeaf (mGetNode match n)
-    alg (PApply n a)        = RNil :< (stripExpr $ mGetExpr match n) { getLambda = a}
-    alg (PLambda n a)       = RNil :< (stripExpr $ mGetExpr match n) { getLambdaBody = a}
     alg (PVariable n)       = RNil :< castLeaf (mGetNode match n)
-    alg (PRnZ n r z)        = RNil :< (stripExpr $ mGetExpr match n) { getReducer=r, getZipper=z }
-    alg (PZipWithN n l)     = RNil :< (stripExpr $ mGetExpr match n) { getLambda = l}
-    alg (PFlip _ a b)       = RNil :< Flip a b
-    alg (PSubdiv _ a b c)   = RNil :< Subdiv a b c
-    alg (PStar n)           = RNil :< stripExpr (match M.! n)
+    -- NOTE: inserted plain nodes aren't stored in the match, so construct them instead of querying
+    alg (PScalarOp _ o a b) = RNil :< ScalarOp o a b
+    alg (PApply n a)        = RNil :< (Apply a $ map stripExpr $ mGetArgList match n)
+    alg (PRnZ n r z)        = RNil :< (RnZ r z $ map stripExpr $ mGetArgList match n)
+    alg (PZipWithN n l)     = RNil :< (ZipWithN l $ map stripExpr $ mGetArgList match n)
+    alg (PFlip n a)         = RNil :< zipWithExprF (flip const) (mGetNode match n) [a]
+    alg (PSubdiv n a)       = RNil :< zipWithExprF (flip const) (mGetNode match n) [a]
+    alg (PLambda n a)       = RNil :< zipWithExprF (flip const) (mGetNode match n) 
+                                      (map stripExpr (getArgList $ findWithDefault (Args []) (n ++ "__args") match) ++ [a])   
+    alg (PStar n)           = stripExpr (mGetSubtree match n)
   
 type RepPattern = (PExpr,PExpr)
 type RepTransform fields = (Match fields -> Maybe (Match fields))
