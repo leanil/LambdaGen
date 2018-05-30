@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds, DeriveFunctor, DeriveFoldable, DeriveTraversable, LambdaCase, FlexibleInstances, PatternSynonyms, TypeSynonymInstances, ViewPatterns #-}
+{-# LANGUAGE DataKinds, DeriveFunctor, DeriveFoldable, DeriveTraversable, LambdaCase, FlexibleInstances, PatternSynonyms, TemplateHaskell, TypeSynonymInstances, ViewPatterns #-}
 
 module Expr where
 
 import Type
 import Control.Comonad.Cofree
+import Data.Eq.Deriving (deriveEq1)
 import Data.List
 import Data.Vinyl
 
@@ -19,7 +20,10 @@ data ExprF a
     -- TODO: support non-adjacent flips on C++ side
     | Flip { getDims :: (Int,Int), getBaseExpr :: a }
     | Subdiv { getDim :: Int, getBlockSize :: Int, getBaseExpr :: a }
+    -- TODO: Flatten
     deriving (Functor, Foldable, Traversable, Show)
+
+deriveEq1 ''ExprF
 
 castLeaf :: ExprF a -> ExprF b
 castLeaf = fmap (const undefined)

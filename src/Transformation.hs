@@ -7,7 +7,7 @@ import Recursion
 import Replace
 import Type
 import Typecheck
-import Utility (intersectWithIndex, setByIndex, takeByIndex, dropByIndex)
+import Utility (intersectWithIndex, setByIndex, takeByIndex, dropByIndex, partitionByIndex)
 import Control.Comonad.Cofree (Cofree ((:<)))
 import Data.Foldable (fold)
 import Data.Functor.Foldable (cata)
@@ -39,6 +39,14 @@ zipZipSwapTrans :: TypecheckT ∈ fields => RepTransform fields
 zipZipSwapTrans = fmap (\x -> foldl' (flip ($)) x updates) . swapBaseCase ("z1","l1","z2","l2") ["f"] where
     updates = [ insert "flip" (Node Nothing $ Flip (0,1) ()) ]
 
+rnzRnZSwap :: RepPattern
+rnzRnZSwap = (MRnZ "r1" (MStar "f") (MLam "l1" (MRnZ "r2" (MStar "g") (MLam "l2" (MStar "h")))),
+              MRnZ "r2" (MStar "f") (MLam "l2" (MRnZ "r1" (MStar "f") (MLam "l1" (MStar "h")))))
+
+rnzRnZSwapTrans :: (TypecheckT ∈ fields, Eq (R fields)) => RepTransform fields
+rnzRnZSwapTrans match = if eqRed then swapBaseCase ("r1","l1","r2","l2") ["h"] match else Nothing where
+    eqRed = mGetSubtree match "f" == mGetSubtree match "g"
+
 zipRnZSwap :: RepPattern
 zipRnZSwap = (MZipWithN "zip" (MLam "l1" (MRnZ "red" (MLam "lr" (MStar "f")) (MLam "lz" (MStar "g")))),
               MRnZ "red" (MLam "lu" (MZipWithN "zf" (MLam "lr" (MStar "f"))))
@@ -59,6 +67,25 @@ zipRnZSwapTrans match = fmap (\x -> foldl' (flip ($)) x updates) $ swapBaseCase 
     freeM = dropByIndex (map fst matches) (mGetArgList match "zip")
     freeVars = dropByIndex (map fst matches) (getParams l1)
 
+rnzZipSwap :: RepPattern
+rnzZipSwap = (MRnZ "red" (MLam "lu" (MZipWithN "zf" (MLam "lr" (MStar "f"))))
+                        (MLam "lz" (MZipWithN "zip" (MLam "l1" (MStar "g")))),
+             MZipWithN "zip" (MLam "l1" (MRnZ "red" (MLam "lr" (MStar "f")) (MLam "lz" (MStar "g")))))
+
+rnzZipSwapTrans :: TypecheckT ∈ fields => RepTransform fields
+rnzZipSwapTrans match = swapBaseCase ("red","lz","zip","l1") ["f","g"] match >>=
+                        (\x -> if varOccur then Nothing else Just $ foldl' (flip ($)) x updates) where
+    updates = [ insert "lr" (Node Nothing lr { getParams = xs }),
+                --TODO: lens?
+                adjust (\(Args x) -> Args (x ++ freeM)) "zip__args",
+                adjust (\(Node x (Lambda a b c)) -> Node x (Lambda (a ++ freeVars) b c)) "l1" ]
+    lr = mGetNode match "lr"
+    us = getParams $ mGetNode match "lu"
+    matches = findVarsInArgs us (mGetArgList match "zf")
+    varOccur = getAny $ fold $ findVarsInSubtrees (map fst us) (mGetSubtree match "f" : mGetArgList match "lr")
+    freeM = dropByIndex (map snd matches) (mGetArgList match "zf")
+    (xs,freeVars) = partitionByIndex (map snd matches) (getParams lr)
+
 swapBaseCase :: TypecheckT ∈ fields => (String,String,String,String) -> [String] -> Match fields -> Maybe (Match fields)
 swapBaseCase (o1,l1',o2,l2') f match = if varOccur then Nothing else Just $ foldl' (flip ($)) match updates where
     l1 = mGetNode match l1'
@@ -73,8 +100,31 @@ swapBaseCase (o1,l1',o2,l2') f match = if varOccur then Nothing else Just $ fold
     (cv,cm,cx,cw) = makeChanges matches l1_params (mGetArgList match o1) (getParams l2) o2_args
     matchVars = takeByIndex (map fst matches) (map fst l1_params)
     rest = dropByIndex (map snd matches) o2_args
-    varOccur = getAny $ fold $ findVarsInSubtrees matchVars (map (mGetSubtree match) f ++ mGetArgList match l1') ++
+    varOccur = getAny $ fold $ findVarsInSubtrees matchVars (map (mGetSubtree match) f ++ concatMap (mGetArgList match) [l1',l2']) ++
                                findVarsInSubtrees (map fst $ l1_params) rest
+
+-- zipSubdiv :: RepPattern
+-- zipSubdiv = (MZipWithN "z1" (MStar "f"),
+--              MFlatten "flat" (MZipWithN "z1" (MLam "l" (MZipWithN "z2" (MStar "f")))))
+
+-- zipSubdivTrans :: TypecheckT ∈ fields => Int -> RepTransform fields
+-- zipSubdivTrans b = subdivBaseCase b ("z1","l","z2")
+
+rnzSubdiv :: RepPattern
+rnzSubdiv = (MRnZ "r1" (MStar "f") (MStar "g"),
+             MRnZ "r1" (MStar "f") (MLam "l" (MRnZ "r2" (MStar "f") (MStar "g"))))
+
+rnzSubdivTrans :: TypecheckT ∈ fields => Int -> RepTransform fields
+rnzSubdivTrans b = subdivBaseCase b ("r1","l","r2")
+
+subdivBaseCase :: TypecheckT ∈ fields => Int -> (String,String,String) -> Match fields -> Maybe (Match fields)
+subdivBaseCase b (o1,l,o2) match = Just $ foldl' (flip ($)) match updates where
+    ms = mGetArgList match o1
+    ts = map (\(getType . fromJust . getAnnot -> FPower t ((_,s0):ds)) -> FPower t ((b,s0):ds)) ms
+    us = zipWith (\i t -> ("u" ++ show i,t)) [1..] ts
+    updates = [ insert (o1 ++ "__args") $ Args $ map (\x -> Nothing :< Subdiv 0 b x) ms,
+                insert l (Node Nothing $ Lambda us [] ()),
+                insert (o2 ++ "__args") $ Args $ map (\x -> Nothing :< (uncurry Variable) x) us ]
 
 findVarInSubtree :: String -> ExprOpt fields -> Any
 findVarInSubtree v = cata alg where

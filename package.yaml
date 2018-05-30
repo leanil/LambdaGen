@@ -23,6 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - comonad
 - containers
+- deriving-compat
 - either
 - free
 - neat-interpolation
