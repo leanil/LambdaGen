@@ -10,39 +10,38 @@ auto evaluator15(std::map<std::string, double*> userData) {
     
     auto v_19 = flip<0>(M2_20);
     for (int idx_1 = 0; idx_1 < 4; ++idx_1) {
-        [=](auto u2){
+        auto u2 = v_19[idx_1];
+        
+        
+        
+        auto v_17 = flip<0>(M1_18);
+        auto v_16 = flip<0>(v_17);
+        for (int idx_3 = 0; idx_3 < 2; ++idx_3) {
+            auto v4 = v_16[idx_3];
             
             
             
-            auto v_17 = flip<0>(M1_18);
-            auto v_16 = flip<0>(v_17);
-            for (int idx_3 = 0; idx_3 < 2; ++idx_3) {
-                [=](auto v4){
+            for (int idx_5 = 0; idx_5 < 3; ++idx_5) {
+                auto x10 = u2[idx_5];
+                auto y10 = v4[idx_5];
+                
+                
+                
+                
+                tmp_5 = x10 * y10;
+                if(idx_5) {
+                    auto x6 = result[idx_1][idx_3];
+                    auto y6 = tmp_5;
                     
                     
                     
-                    for (int idx_5 = 0; idx_5 < 3; ++idx_5) {
-                        [=](auto x10, auto y10){
-                            
-                            
-                            
-                            
-                            tmp_5 = x10 * y10;
-                        }(u2[idx_5],v4[idx_5]);
-                        if(idx_5)
-                            [=](auto x6, auto y6){
-                                
-                                
-                                
-                                
-                                result[idx_1][idx_3] = x6 + y6;
-                            }(result[idx_1][idx_3],tmp_5);
-                        else
-                            result[idx_1][idx_3] = tmp_5;
-                    }
-                }(v_16[idx_3]);
+                    
+                    result[idx_1][idx_3] = x6 + y6;
+                }
+                else
+                    result[idx_1][idx_3] = tmp_5;
             }
-        }(v_19[idx_1]);
+        }
     }
     return result;
 }

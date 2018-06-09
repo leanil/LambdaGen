@@ -7,7 +7,6 @@ import Print
 import Recursion
 import Type
 import Control.Comonad (extract)
-import Control.Comonad.Cofree (Cofree)
 import Data.Either (lefts)
 import Data.Functor.Foldable (cata)
 import Data.List (intercalate, nub)

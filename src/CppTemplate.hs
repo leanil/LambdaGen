@@ -18,49 +18,58 @@ scalarOpTemplate lhsCode rhsCode result lhsResult op rhsResult =
         $result = $lhsResult $op $rhsResult;
     |]
 
-appTemplate :: [Text] -> Text -> [Text] -> Text
-appTemplate (concat -> evals) lambda (intercalate ", " -> names) = 
+appTemplate :: [Text] -> Text -> [Text] -> [Text] -> Text
+appTemplate (concat -> evals) lambda params args = 
+    let setParams = makeAssignments params args in
     [text|
         $evals
-        $lambda($names);
+        $setParams
+        $lambda
     |]
+
+makeAssignments :: [Text] -> [Text] -> Text
+makeAssignments names values = concat $ zipWith assignTemplate (map (append "auto ") names) values
 
 -- TODO: let-bound expressions should allocate with a given name
-lambdaTemplate :: [Text] -> [Text] -> [Text] -> [Text] -> Text -> Text
-lambdaTemplate (intercalate ", " -> params) (concat -> evals) (map (append "auto ") -> names) values body =
-    let assigns = concat $ zipWith assignTemplate names values in
+-- The caller sets the parameter values.
+lambdaTemplate :: [Text] -> [Text] -> [Text] -> Text -> Text
+lambdaTemplate (concat -> evals) names values body =
+    let assigns = makeAssignments names values in
     [text|
-        [=]($params){
-            $evals
-            $assigns
-            $body
-        }
+        $evals
+        $assigns
+        $body
     |]
 
-indexVecs :: [Text] -> Text -> Text
-indexVecs vs (cons '[' . (flip snoc) ']' -> idx) = intercalate "," $ map (`append` idx) vs
+indexedVecs :: [Text] -> Text -> [Text]
+indexedVecs vs (cons '[' . (flip snoc) ']' -> idx) = map (`append` idx) vs
 
-rnzTemplate :: [Text] -> Text -> Text -> Text -> Text -> Text -> Text -> [Text] -> Text
-rnzTemplate (concat -> evalVecs) resultId temp idx size reducer zipper vecNames =
-    let indexedVecs = indexVecs vecNames idx in
+rnzTemplate :: [Text] -> Text -> Text -> Text -> Text -> Text -> [Text] -> Text -> [Text] -> [Text] -> Text
+rnzTemplate (concat -> evalVecs) resultId temp idx size reducer red_params zipper zip_params args =
+    let setZipParams = makeAssignments zip_params (indexedVecs args idx) 
+        setRedParams = makeAssignments red_params [resultId,temp] in
     [text|
         $evalVecs
         for (int $idx = 0; $idx < $size; ++$idx) {
-            $zipper($indexedVecs);
-            if($idx)
-                $reducer($resultId,$temp);
+            $setZipParams
+            $zipper
+            if($idx) {
+                $setRedParams
+                $reducer
+            }
             else
                 $resultId = $temp;
         }
     |]
 
-zipWithNTemplate :: [Text] -> Text -> Text -> Text -> [Text] -> Text
-zipWithNTemplate (concat -> evalVecs) idx size lambda vecNames =
-    let indexedVecs = indexVecs vecNames idx in
+zipWithNTemplate :: [Text] -> Text -> Text -> Text -> [Text] -> [Text] -> Text
+zipWithNTemplate (concat -> evalVecs) idx size lambda params args =
+    let setParams =  makeAssignments params (indexedVecs args idx) in
     [text|
         $evalVecs
         for (int $idx = 0; $idx < $size; ++$idx) {
-            $lambda($indexedVecs);
+            $setParams
+            $lambda
         }
     |]
 

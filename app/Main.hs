@@ -7,6 +7,7 @@ import Expr
 import FunctionalTest
 import Metrics
 import Parallel
+import qualified PerformanceTest
 import Print
 import Recursion
 import Replace
@@ -20,7 +21,7 @@ import Data.Proxy (Proxy(Proxy))
 import Data.Vinyl
 
 test :: Expr0
-test = fst zzSwap
+test = PerformanceTest.matMatMul
 
 process :: TypecheckT ∈ fields => Expr fields -> 
     Expr (ResultPack ': Result ': ParData ': NodeId ': SubtreeSize ': fields)

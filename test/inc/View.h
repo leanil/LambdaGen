@@ -43,16 +43,16 @@ struct Flip<0, List<A, List<B, T>>> {
 template<int D, typename S>
 using flip_t = typename Flip<D, S>::type;
 
-template<typename Ptr, typename T, typename Ds> class View;
+template<typename Ptr, typename T, typename Ds, bool IsRef = false> class View;
 
-template<int d, typename Ptr, typename T, typename Ds>
-auto flip(View<Ptr, T, Ds> v) {
-    return View<Ptr, T, flip_t<d, Ds>>(v.data);
+template<int d, typename Ptr, typename T, typename Ds, bool IsRef>
+auto flip(View<Ptr, T, Ds, IsRef> v) {
+    return View<Ptr, T, flip_t<d, Ds>, IsRef>(v.data);
 }
 
-template<int i, int b, typename Ptr, typename T, typename Ds>
-auto subdiv(View<Ptr, T, Ds> v) {
-    return View<Ptr, T, subdiv_t<i, b, Ds>>(v.data);
+template<int i, int b, typename Ptr, typename T, typename Ds, bool IsRef>
+auto subdiv(View<Ptr, T, Ds, IsRef> v) {
+    return View<Ptr, T, subdiv_t<i, b, Ds>, IsRef>(v.data);
 }
 
 template<typename L>
@@ -64,15 +64,23 @@ struct ViewSize {
     using type = typename Foldr<Prod, Int<1>, L>::type;
 };
 
-template<typename Ptr, typename T, typename D, typename Ds>
-class View<Ptr, T, List<D, Ds>> {
+template<typename Ptr, typename T, typename D, typename Ds, bool IsRef>
+class View<Ptr, T, List<D, Ds>, IsRef> {
 public:
     View(Ptr data) : data(data) {}
-    View() : data(new T[ViewSize<List<D, Ds>>::type()]), share(data) {}
+    View() : data(new T[typename ViewSize<List<D, Ds>>::type()]), share(data) {}
 
     static constexpr int size = D::dim;
 
-    View<Ptr, T, List<D, Ds>>& operator=(const View<Ptr, T, List<D, Ds>>& other) {
+    View<Ptr, T, List<D, Ds>, IsRef>& operator=(const View<Ptr, T, List<D, Ds>, IsRef>& other) {
+        for (int i = 0; i < D::dim; ++i) {
+            (*this)[i] = other[i];
+        }
+        return *this;
+    }
+
+    template<bool OtherRef>
+    View<Ptr, T, List<D, Ds>, IsRef> operator=(const View<Ptr, T, List<D, Ds>, OtherRef>& other) {
         for (int i = 0; i < D::dim; ++i) {
             (*this)[i] = other[i];
         }
@@ -80,7 +88,7 @@ public:
     }
 
     auto operator[](int idx) const {
-        return View<Ptr, T, Ds>(data + idx*D::stride);
+        return View<Ptr, T, Ds, true>(data + idx*D::stride);
     }
 
     //template<typename I, typename... Idx>
@@ -88,8 +96,8 @@ public:
     //    return slice<EmptyList, List<D, Ds>>(0, i, idx...);
     //}
 
-    Ptr data;
-    std::shared_ptr<T> share;
+    Ptr const data;
+    const std::shared_ptr<T> share;
 private:
     //template<typename SortedDims, typename Dims, typename I, typename... Idx, std::enable_if_t<std::is_placeholder_v<I> != 0, int> = 0>
     //auto slice(int offset, I i, Idx... idx) const {
@@ -107,8 +115,8 @@ private:
     //}
 };
 
-template<typename Ptr, typename T, typename Dims>
-std::ostream& operator<<(std::ostream& out, const View<Ptr, T, Dims>& v) {
+template<typename Ptr, typename T, typename Dims, bool IsRef>
+std::ostream& operator<<(std::ostream& out, const View<Ptr, T, Dims, IsRef>& v) {
     out << "{";
     for (int i = 0; i < Dims::head::dim; ++i) {
         out << (i ? "," : "") << v[i];
@@ -117,13 +125,17 @@ std::ostream& operator<<(std::ostream& out, const View<Ptr, T, Dims>& v) {
 }
 
 template<typename Ptr, typename T>
-class View<Ptr, T, EmptyList> {
+class View<Ptr, T, EmptyList, true> {
 public:
     View(Ptr data) : data(data) {}
-    View() : data(new T), share(data) {}
 
-    auto& operator=(const View<Ptr, T, EmptyList>& other) const {
-        *data = *other.data;
+    View<Ptr, T, EmptyList, true>& operator=(const View<Ptr, T, EmptyList, true>& other) {
+        return this->operator=<true>(other);
+    }
+
+    template<bool OtherRef>
+    View<Ptr, T, EmptyList, true>& operator=(const View<Ptr, T, EmptyList, OtherRef>& other) {
+        *data = (T)other;
         return *this;
     }
 
@@ -135,11 +147,32 @@ public:
         return *data;
     }
 
-    Ptr data;
-    std::shared_ptr<T> share;
+    Ptr const data;
 };
 
+// Specialization for holding single scalar partial results / temporaries.
 template<typename Ptr, typename T>
-std::ostream& operator<<(std::ostream& out, const View<Ptr, T, EmptyList>& v) {
+class View<Ptr, T, EmptyList, false> {
+public:
+
+    template<bool OtherRef>
+    View<Ptr, T, EmptyList, true>& operator=(const View<Ptr, T, EmptyList, OtherRef>& other) {
+        data = (T)other;
+        return *this;
+    }
+
+    void operator=(T x) {
+        data = x;
+    }
+
+    operator T() const {
+        return data;
+    }
+
+    T data;
+};
+
+template<typename Ptr, typename T, bool IsRef>
+std::ostream& operator<<(std::ostream& out, const View<Ptr, T, EmptyList, IsRef>& v) {
     return out << (T)v;
 }

@@ -30,21 +30,20 @@ cpuCodeGenAlg ((fieldVal -> Std mem True _) ::< Variable name _) = CpuCodeT $ as
 cpuCodeGenAlg (r ::< ScalarOp op (ra :< _,CpuCodeT a) (rb :< _,CpuCodeT b)) =
     CpuCodeT $ scalarOpTemplate a b (getResultId r) (getResultId ra) (singleton op) (getResultId rb)
 
-cpuCodeGenAlg (_ ::< Apply (_,CpuCodeT a) vals) =
-    CpuCodeT $ appTemplate evals a names where
-        (evals,names) = unzip $ map (\(rb :< _,CpuCodeT b) -> (b,getResultId rb)) vals
-       
-cpuCodeGenAlg (_ ::< Lambda vs binds (_,CpuCodeT a)) =
-    CpuCodeT $ lambdaTemplate (map (append "auto " . pack . fst) vs) evals names values a where
+cpuCodeGenAlg (_ ::< Apply (getParamNames -> pa,CpuCodeT a) (unzipCodes -> (evals,names))) =
+    CpuCodeT $ appTemplate evals a pa names where
+        
+cpuCodeGenAlg (_ ::< Lambda _ binds (_,CpuCodeT a)) =
+    CpuCodeT $ lambdaTemplate evals names values a where
         (evals, names, values) = unzip3 $ map (\(n,(r :< _,CpuCodeT b)) -> (b,pack n,getResultId r)) binds
 
-cpuCodeGenAlg (r ::< RnZ (_,CpuCodeT a) (_,CpuCodeT b) vs@(unzipCodes -> (evals,names))) =
-    CpuCodeT $ rnzTemplate evals resultId temp (pack $ makeHofIdx r) (pack $ show $ getVecSize vs) a b names where
+cpuCodeGenAlg (r ::< RnZ (getParamNames -> pa,CpuCodeT a) (getParamNames -> pb,CpuCodeT b) vs@(unzipCodes -> (evals,names))) =
+    CpuCodeT $ rnzTemplate evals resultId temp (pack $ makeHofIdx r) (pack $ show $ getVecSize vs) a pa b pb names where
         resultId = getResultId r
         temp = append "tmp_" $ pack $ show $ getNodeId r
 
-cpuCodeGenAlg (r ::< ZipWithN (_,CpuCodeT a) vs@(unzipCodes -> (evals,names))) =
-    CpuCodeT $ zipWithNTemplate evals (pack $ makeHofIdx r) (pack $ show $ getVecSize vs) a names
+cpuCodeGenAlg (r ::< ZipWithN (getParamNames -> pa,CpuCodeT a) vs@(unzipCodes -> (evals,names))) =
+    CpuCodeT $ zipWithNTemplate evals (pack $ makeHofIdx r) (pack $ show $ getVecSize vs) a pa names
 
 cpuCodeGenAlg (r ::< Flip (i,j) (ra :< _,CpuCodeT a)) =
     CpuCodeT $ flipTemplate a auto (getResultId r) (pack $ show i) (pack $ show j) (getResultId ra) where
@@ -63,6 +62,9 @@ unzipCodes = unzip . map (\(r :< _,CpuCodeT a) -> (a,getResultId r))
 
 getVecSize :: TypecheckT ∈ fields => [(Expr fields,a)] -> Int
 getVecSize (((getType -> FPower _ ((s,_):_)) :< _,_):_) = s
+
+getParamNames :: Expr fields -> [Text]
+getParamNames (_ :< Lambda params _ _) = map (pack . fst) params
 
 cpuCodeGen :: (NodeId ∈ fields, Result ∈ fields, ResultPack ∈ fields, NodeId ∈ fields, TypecheckT ∈ fields) => 
     String -> Expr fields -> String

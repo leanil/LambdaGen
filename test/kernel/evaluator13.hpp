@@ -10,38 +10,37 @@ auto evaluator13(std::map<std::string, double*> userData) {
     View<double*, double, to_list_t<>> tmp_6;
     
     for (int idx_2 = 0; idx_2 < 2; ++idx_2) {
-        [=](auto v3){
+        auto v3 = M1_19[idx_2];
+        
+        
+        
+        auto v_17 = flip<0>(M2_18);
+        for (int idx_4 = 0; idx_4 < 4; ++idx_4) {
+            auto u5 = v_17[idx_4];
             
             
             
-            auto v_17 = flip<0>(M2_18);
-            for (int idx_4 = 0; idx_4 < 4; ++idx_4) {
-                [=](auto u5){
+            for (int idx_6 = 0; idx_6 < 3; ++idx_6) {
+                auto x11 = u5[idx_6];
+                auto y11 = v3[idx_6];
+                
+                
+                
+                
+                tmp_6 = x11 * y11;
+                if(idx_6) {
+                    auto x7 = v_2[idx_2][idx_4];
+                    auto y7 = tmp_6;
                     
                     
                     
-                    for (int idx_6 = 0; idx_6 < 3; ++idx_6) {
-                        [=](auto x11, auto y11){
-                            
-                            
-                            
-                            
-                            tmp_6 = x11 * y11;
-                        }(u5[idx_6],v3[idx_6]);
-                        if(idx_6)
-                            [=](auto x7, auto y7){
-                                
-                                
-                                
-                                
-                                v_2[idx_2][idx_4] = x7 + y7;
-                            }(v_2[idx_2][idx_4],tmp_6);
-                        else
-                            v_2[idx_2][idx_4] = tmp_6;
-                    }
-                }(v_17[idx_4]);
+                    
+                    v_2[idx_2][idx_4] = x7 + y7;
+                }
+                else
+                    v_2[idx_2][idx_4] = tmp_6;
             }
-        }(M1_19[idx_2]);
+        }
     }
     result = flip<0>(v_2);
     return result;

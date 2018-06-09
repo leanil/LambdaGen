@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.5)
 
 project(LambdaGen LANGUAGES CXX)
 
@@ -19,8 +19,8 @@ target_include_directories(LambdaGen PRIVATE
                            D:/Programs/boost_1_61_0/)
 
 set_target_properties(LambdaGen PROPERTIES
-                      C_STANDARD 14
-                      C_STANDARD_REQUIRED ON)
+                      CXX_STANDARD 14
+                      CXX_STANDARD_REQUIRED ON)
                       
 enable_testing()
 list(LENGTH KERNELS TESTS)

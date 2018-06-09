@@ -4,7 +4,7 @@ import Expr
 import LinAlg
 import Type
 
-matVecMul, vecSum, tensorProd :: Expr0
+matVecMul, vecSum, tensorProd, matMatMul :: Expr0
 matVecMul =
     let a = 2^13
         b = 2^13 in
@@ -23,3 +23,15 @@ tensorProd =
     let m    = var "m" (power double [400,300])
         prod = lam [m] (mkRnZ (matAdd 300 200) (outerProd 300 200) [m,vecView "big_mat" [400,200]])
     in  mkMap prod (transpose [1,3,2] $ vecView "big_tens" [200,300,400])
+
+matMatMul =
+    let size = 512
+        u = var "u" (power double [size])
+        v = var "v" (power double [size]) in
+    mkMap
+        (lam [u]
+            (mkMap
+                (lam [v]
+                    (mkRnZ sclAdd sclMul [u,v]))
+                (mkFlip (0,1) (vecView "M2" [size,size]))))
+        (vecView "M1" [size,size])
