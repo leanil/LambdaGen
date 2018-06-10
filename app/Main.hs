@@ -32,25 +32,25 @@ process expr =
     assignNodeId $
     cata constFoldAlg expr
 
-main :: IO ()
-main = do
-    let tcd = cata (annotate typecheckAlg) $ makeSymbolsUnique test
+compile :: String -> String -> Expr0 -> IO ()
+compile fileName kernelName expr = do
+    let tcd = cata (annotate typecheckAlg) $ makeSymbolsUnique expr
     case fieldVal @TypecheckT $ extract tcd of
         (Left _) -> do
             let rep = replaceAll partialApp partialAppTrans tcd
-            --let rep' = replace1TopDown zipZipSwap zipZipSwapTrans tcd
-            let recheck = cata (annotate typecheckAlg) rep
-            case fieldVal @TypecheckT $ extract recheck of
-                (Left _) -> do
-                    let prd = process recheck
-                    writeFile "../test/result.hpp" $ cpuCodeGen "eval" prd
-                    putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) prd
-                (Right errors) ->
-                    putStr $ intercalate "\n" errors ++ "\n\n" ++
-                    printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd
+            let prd = process $ typecheck' rep
+            writeFile fileName $ cpuCodeGen kernelName prd
+            putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) prd
         (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
             printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd
+
+main :: IO ()
+main = do
+    compile "../test/result1.hpp" "matMatMul" PerformanceTest.matMatMul
+    putStrLn ""
+    compile "../test/result2.hpp" "matMatMulTrans" PerformanceTest.matMatMulTrans
+    
 
 getLeft :: Either a b -> a
 getLeft (Left l) = l

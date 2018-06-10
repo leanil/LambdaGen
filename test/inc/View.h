@@ -72,15 +72,14 @@ public:
 
     static constexpr int size = D::dim;
 
+    // Omitting this results in an implicitly deleted copy assignment, which takes precedence
+    // over the below template.
     View<Ptr, T, List<D, Ds>, IsRef>& operator=(const View<Ptr, T, List<D, Ds>, IsRef>& other) {
-        for (int i = 0; i < D::dim; ++i) {
-            (*this)[i] = other[i];
-        }
-        return *this;
+        return this->operator=<IsRef>(other);
     }
 
     template<bool OtherRef>
-    View<Ptr, T, List<D, Ds>, IsRef> operator=(const View<Ptr, T, List<D, Ds>, OtherRef>& other) {
+    View<Ptr, T, List<D, Ds>, IsRef>& operator=(const View<Ptr, T, List<D, Ds>, OtherRef>& other) {
         for (int i = 0; i < D::dim; ++i) {
             (*this)[i] = other[i];
         }

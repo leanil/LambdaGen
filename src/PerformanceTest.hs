@@ -2,9 +2,13 @@ module PerformanceTest where
 
 import Expr
 import LinAlg
+import Replace
+import Transformation
 import Type
+import Typecheck
+import Utility
 
-matVecMul, vecSum, tensorProd, matMatMul :: Expr0
+matVecMul, vecSum, tensorProd, matMatMul, matMatMulTrans :: Expr0
 matVecMul =
     let a = 2^13
         b = 2^13 in
@@ -35,3 +39,5 @@ matMatMul =
                     (mkRnZ sclAdd sclMul [u,v]))
                 (mkFlip (0,1) (vecView "M2" [size,size]))))
         (vecView "M1" [size,size])
+
+matMatMulTrans = replace1TopDown zipRnZSwap zipRnZSwapTrans $ typecheck' matMatMul
