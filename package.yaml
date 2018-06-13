@@ -32,6 +32,7 @@ dependencies:
 - recursion-schemes
 - text
 - vinyl
+- websockets
 
 library:
   source-dirs: src

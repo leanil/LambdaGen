@@ -1,13 +1,24 @@
 import * as React from "react";
 
-class TrayWidget extends React.Component<any, any> {
+export interface ITrayWidgetProps {
+	handleGenerate: () => void;
+}
 
-	constructor(props: any) {
+class TrayWidget extends React.Component<ITrayWidgetProps, any> {
+
+	constructor(props: ITrayWidgetProps) {
 		super(props);
 	}
 
 	public render() {
-		return <div className="tray">{this.props.children}</div>;
+		return (
+			<div className="tray">
+				<button className="generate" onClick={this.props.handleGenerate}>
+					Generate
+				</button>
+				{this.props.children}
+			</div>
+		);
 	}
 }
 

@@ -6,24 +6,5 @@
       "node_modules/**/*.ts"
     ]
   },
-  "rules": {
-    "jsx-no-lambda": {
-      "severity": "off"
-    },
-    "no-console": {
-      "severity": "warning"
-    },
-    "ordered-imports": {
-      "severity": "warning"
-    },
-    "comment-format": {
-      "severity": "warning"
-    },
-    "no-var-keyword": {
-      "severity": "warning"
-    },
-    "prefer-const": {
-      "severity": "warning"
-    }
-  }
+  "defaultSeverity": "warning"
 }

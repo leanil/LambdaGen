@@ -1,6 +1,7 @@
 import * as React from "react";
 import * as SRD from "storm-react-diagrams";
 import { DefaultNodeModel, DiagramWidget } from "storm-react-diagrams";
+import { SyntaxTreeNodeModel } from "./SyntaxTreeNode/SyntaxTreeNodeModel"
 
 export interface IBodyWidgetProps {
 	engine: SRD.DiagramEngine;
@@ -24,9 +25,10 @@ class BodyWidget extends React.Component<IBodyWidgetProps, any> {
 						node = new DefaultNodeModel("Const", "rgb(192,255,0)");
 						node.addOutPort("result")
 					} else {
-						node = new DefaultNodeModel("ScalarOp", "rgb(0,192,255)");
-						node.addInPort("a");
-						node.addInPort("b");
+						// node = new DefaultNodeModel("ScalarOp", "rgb(0,192,255)");
+						node = new SyntaxTreeNodeModel();
+						// node.addInPort("a");
+						// node.addInPort("b");
 					}
 					const points = this.props.engine.getRelativeMousePoint(event);
 					node.x = points.x;

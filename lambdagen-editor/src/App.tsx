@@ -2,6 +2,8 @@ import BodyWidget from "./components/BodyWidget"
 import TrayItemWidget from "./components/TrayItemWidget";
 import TrayWidget from "./components/TrayWidget";
 
+import { SyntaxTreeNodeFactory } from "./components/SyntaxTreeNode/SyntaxTreeNodeFactory"
+
 import * as React from 'react';
 import * as SRD from "storm-react-diagrams";
 
@@ -20,8 +22,18 @@ class App extends React.Component<any,any> {
 		this.engine.installDefaultFactories();
     this.model = new SRD.DiagramModel();
     this.engine.setDiagramModel(this.model);
+    this.engine.registerNodeFactory(new SyntaxTreeNodeFactory());
+    this.handleGenerate = this.handleGenerate.bind(this);
   }
   
+  public handleGenerate() {
+    const socket = new WebSocket('ws://localhost:2103');
+    socket.addEventListener('open', event => {
+      socket.send(JSON.stringify(this.model.serializeDiagram()));
+      socket.close();
+    });
+  }
+
   public render() {
     return (
       <div className="body">
@@ -29,7 +41,7 @@ class App extends React.Component<any,any> {
 					<div className="title">LambdaGen editor</div>
 				</div>
 				<div className="content">
-					<TrayWidget>
+					<TrayWidget handleGenerate={this.handleGenerate}>
 						<TrayItemWidget model={{ type: "Const" }} name="Const" color="rgb(192,255,0)" />
 						<TrayItemWidget model={{ type: "ScalarOp" }} name="ScalarOp" color="rgb(0,192,255)" />
 					</TrayWidget>
