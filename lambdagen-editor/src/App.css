@@ -62,3 +62,9 @@ button.generate {
   border-radius: 3px; }
   button:hover.generate  {
     background: #00c0ff; }
+
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}

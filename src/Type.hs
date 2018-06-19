@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, PatternSynonyms #-}
+{-# LANGUAGE DeriveFunctor, DeriveGeneric, FlexibleInstances, PatternSynonyms, StandaloneDeriving, TypeSynonymInstances #-}
 
 module Type where
 
@@ -6,12 +6,13 @@ import Recursion
 import Data.Functor.Classes (Eq1(..), Show1(..))
 import Data.Functor.Foldable (cata, Fix(..))
 import Data.List (intercalate)
+import GHC.Generics (Generic)
 
 data TypeF a
     = Double
     | Power { getBase :: a, getDims :: [(Int,Int)] }
     | Arrow { from :: [a], to :: a }
-    deriving (Eq, Show, Functor)
+    deriving (Eq, Functor, Show)
 
 instance Eq1 TypeF where
     liftEq _ Double Double = True
@@ -25,6 +26,9 @@ instance Show1 TypeF where
     liftShowsPrec sp l d (Arrow a b) =  l a . showString "->" . sp d b
 
 type Type = Fix TypeF
+
+deriving instance Generic Type
+deriving instance Generic (TypeF Type)
 
 double :: Type
 double = Fix Double

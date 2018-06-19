@@ -6,5 +6,9 @@
       "node_modules/**/*.ts"
     ]
   },
-  "defaultSeverity": "warning"
+  "defaultSeverity": "warning",
+  "rules": {
+    "jsx-no-lambda": { "severity": "off" },
+    "max-classes-per-file": { "severity": "off" }
+  }
 }

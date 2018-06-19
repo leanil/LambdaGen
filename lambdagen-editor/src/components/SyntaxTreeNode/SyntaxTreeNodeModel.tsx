@@ -3,15 +3,18 @@ import * as SRD from "storm-react-diagrams";
 
 export class SyntaxTreeNodeModel extends SRD.NodeModel {
 
-	public name: string = "SclOp"
-	public color: string = "rgb(0,192,255)";
+	public name: string;
+	public color: string;
 	public ports: { [s: string]: SRD.DefaultPortModel };
 
-	constructor() {
-        super("syntaxTree");
-        this.addPort(new SRD.DefaultPortModel(true, "left", "left"));
-        this.addPort(new SRD.DefaultPortModel(true, "right", "right"));
-        this.addPort(new SRD.DefaultPortModel(false, "result", "result"));
+	constructor(nodeType: string, name: string, color: string, ports: string[]) {
+		super(nodeType);
+		this.name = name;
+		this.color = color;
+		for(const portName of ports) {
+			this.addPort(new SRD.DefaultPortModel(true,portName,portName));
+		}
+		this.addPort(new SRD.DefaultPortModel(false,"result","result"));
 	}
 
 	public getInPorts(): SRD.DefaultPortModel[] {

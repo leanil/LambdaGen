@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators #-}
 
-
 import ConstFold
 import CpuCodeGen
 import Expr

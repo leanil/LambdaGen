@@ -1,19 +1,21 @@
-import { SyntaxTreeNodeModel } from "./SyntaxTreeNodeModel"
-import { SyntaxTreeNodeWidget } from "./SyntaxTreeNodeWidget"
+import { SyntaxTreeNodeModel } from "./SyntaxTreeNodeModel";
+import { ISyntaxTreeNodeProps, SyntaxTreeNodeWidget } from "./SyntaxTreeNodeWidget";
 
 import * as React from "react";
 import * as SRD from "storm-react-diagrams";
 
-export class SyntaxTreeNodeFactory extends SRD.AbstractNodeFactory<SyntaxTreeNodeModel> {
-	constructor() {
-		super("syntaxTree");
+export class SyntaxTreeNodeFactory<ModelT extends SyntaxTreeNodeModel, WidgetT extends SyntaxTreeNodeWidget<ModelT>>
+       extends SRD.AbstractNodeFactory<ModelT>
+{
+	constructor(private Model: new () => ModelT, private Widget: new (props: ISyntaxTreeNodeProps<ModelT>) => WidgetT, nodeType: string) {
+		super(nodeType);
 	}
 
-	public generateReactWidget(diagramEngine: SRD.DiagramEngine, node: SyntaxTreeNodeModel): JSX.Element {
-		return <SyntaxTreeNodeWidget node={node} diagramEngine={diagramEngine} />;
+	public generateReactWidget(diagramEngine: SRD.DiagramEngine, node: ModelT): JSX.Element {
+        return <this.Widget node={node} diagramEngine={diagramEngine} />;
 	}
 
 	public getNewInstance() {
-		return new SyntaxTreeNodeModel();
+		return new this.Model();
     }
 }
