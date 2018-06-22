@@ -57,6 +57,12 @@ cpuCodeGenAlg (r ::< Subdiv i b (ra :< _,CpuCodeT a)) =
             Std _ True _ -> ""
             Std _ False _ -> "auto "
 
+cpuCodeGenAlg (r ::< Flatten i (ra :< _,CpuCodeT a)) =
+    CpuCodeT $ flattenTemplate a auto (getResultId r) (pack $ show i) (getResultId ra) where
+        auto = case fieldVal r of
+            Std _ True _ -> ""
+            Std _ False _ -> "auto "            
+
 unzipCodes :: Result ∈ fields => [(Expr fields,CpuCodeT)] -> ([Text],[Text])
 unzipCodes = unzip . map (\(r :< _,CpuCodeT a) -> (a,getResultId r))
 

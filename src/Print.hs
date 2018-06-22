@@ -45,6 +45,8 @@ printerAlg _ (r ::< Flip a b) = mkTabs r ++ "Flip " ++ show a ++ ": " ++ show (r
 
 printerAlg _ (r ::< Subdiv a b c) = mkTabs r ++ "Subdiv " ++ show a ++ " " ++ show b ++ ": " ++ show (rcast r :: R select) ++ "\n" ++ c
 
+printerAlg _ (r ::< Flatten a b) = mkTabs r ++ "Flatten " ++ show a ++ ": " ++ show (rcast r :: R select) ++ "\n" ++ b
+
 printExpr :: (select ⊆ (IndentT : fields), RecAll Identity select Show) =>
      Proxy (R select) -> Cofree ExprF (R fields) ->  String
 printExpr s e = cata (printerAlg s) $ indent e

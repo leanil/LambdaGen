@@ -22,6 +22,7 @@ data PExprF a
     | PZipWithN String a
     | PFlip String a
     | PSubdiv String a
+    | PFlatten String a
     | PStar String
     deriving (Eq, Functor, Show)
 
@@ -39,6 +40,7 @@ pattern MRnZ n red zip  = Fix (PRnZ n red zip)
 pattern MZipWithN n lam = Fix (PZipWithN n lam)
 pattern MFlip n a       = Fix (PFlip n a)
 pattern MSubdiv n a     = Fix (PSubdiv n a)
+pattern MFlatten n a    = Fix (PFlatten n a)
 pattern MStar id        = Fix (PStar id)
 
 type ExprOpt fields = Cofree ExprF (Maybe (R fields))
@@ -81,6 +83,7 @@ makeComp :: (Expr fields, PExpr) -> Either (Maybe (Match fields)) (CofreeF ExprF
 makeComp (n@(_ :< m@(ScalarOp a _ _)), MSclOp i b c d) | a == b = Right $ saveNode i n ::< zipExprF m [c,d]
 makeComp (n@(_ :< m@Flip{}), MFlip i a)                         = Right $ saveNode i n ::< zipExprF m [a]
 makeComp (n@(_ :< m@Subdiv{}), MSubdiv i a)                     = Right $ saveNode i n ::< zipExprF m [a]
+makeComp (n@(_ :< m@Flatten{}), MFlatten i a)                   = Right $ saveNode i n ::< zipExprF m [a]
 makeComp (n@(_ :< m@Scalar{}), MScl i)                          = Right $ saveNode i n ::< castLeaf m
 makeComp (n@(_ :< m@View{}), MView i)                           = Right $ saveNode i n ::< castLeaf m
 makeComp (n@(_ :< m@Variable{}), MVar i)                        = Right $ saveNode i n ::< castLeaf m
@@ -112,6 +115,7 @@ fillReplacement match = cata alg where
     alg (PZipWithN n l)     = RNil :< (ZipWithN l $ map stripExpr $ mGetArgList match n)
     alg (PFlip n a)         = RNil :< zipWithExprF (flip const) (mGetNode match n) [a]
     alg (PSubdiv n a)       = RNil :< zipWithExprF (flip const) (mGetNode match n) [a]
+    alg (PFlatten n a)      = RNil :< zipWithExprF (flip const) (mGetNode match n) [a]
     alg (PLambda n a)       = RNil :< zipWithExprF (flip const) (mGetNode match n) 
                                       (map stripExpr (getArgList $ findWithDefault (Args []) (n ++ "__args") match) ++ [a])   
     alg (PStar n)           = stripExpr (mGetSubtree match n)

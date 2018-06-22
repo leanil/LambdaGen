@@ -87,6 +87,13 @@ subdivTemplate rhsCode auto result idx block rhsResult =
         $auto$result = subdiv<$idx,$block>($rhsResult);
     |]
 
+flattenTemplate :: Text -> Text -> Text -> Text -> Text -> Text
+flattenTemplate rhsCode auto result idx rhsResult =
+    [text|
+        $rhsCode
+        $auto$result = flatten<$idx>($rhsResult);
+    |]
+
 viewDimElemTemplate :: (Int, Int) -> Text
 viewDimElemTemplate (1,1) = ""
 viewDimElemTemplate (pack . show -> size, pack . show -> stride) =

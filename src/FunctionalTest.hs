@@ -93,7 +93,7 @@ test11 = (
             a),
     "{4,6,8}")
 
-matMatMul, zzSwap, zrSwap, rzSwap, rSubdiv, rrSwap :: Test
+matMatMul, zzSwap, zrSwap, rzSwap, rSubdiv, rrSwap, zSubdiv :: Test
 matMatMul = (
     let u = var "u" (power double [3])
         v = var "v" (power double [3]) in
@@ -116,5 +116,7 @@ rSubdiv = mapFst (replace1TopDown rnzSubdiv (rnzSubdivTrans 1) . typecheck') mat
 
 rrSwap = mapFst (replace1TopDown rnzRnZSwap rnzRnZSwapTrans . typecheck') rSubdiv
 
+zSubdiv = mapFst (replace1TopDown zipSubdiv (zipSubdivTrans 1) . typecheck') matMatMul
+
 funcTests :: [Test]
-funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, matMatMul, zzSwap, zrSwap, rzSwap, rrSwap, rSubdiv]
+funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, matMatMul, zzSwap, zrSwap, rzSwap, rrSwap, rSubdiv, zSubdiv]

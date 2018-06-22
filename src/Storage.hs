@@ -58,6 +58,9 @@ assignStgAlg (r :< Flip a b, s) = Std x y False ::< Flip a (b,Nothing) where
 assignStgAlg (r :< Subdiv a b c, s) = Std x y False ::< Subdiv a b (c,Nothing) where
     Std x y _ = fst $ makeId r s
 
+assignStgAlg (r :< Flatten a b, s) = Std x y False ::< Flatten a (b,Nothing) where
+    Std x y _ = fst $ makeId r s
+
 makeId :: NodeId ∈ fields => R fields -> Maybe String -> (Result, String)
 makeId (getNodeId -> nodeId) inherit = (Std myId (isJust inherit) (isNothing inherit), myId) where
     myId = fromMaybe ("v_" ++ show nodeId) inherit

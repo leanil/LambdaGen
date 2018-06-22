@@ -20,7 +20,7 @@ import Data.Proxy (Proxy(Proxy))
 import Data.Vinyl
 
 test :: Expr0
-test = PerformanceTest.matMatMul
+test = fst zSubdiv
 
 process :: TypecheckT ∈ fields => Expr fields -> 
     Expr (ResultPack ': Result ': ParData ': NodeId ': SubtreeSize ': fields)
@@ -46,9 +46,10 @@ compile fileName kernelName expr = do
 
 main :: IO ()
 main = do
-    compile "../test/result1.hpp" "matMatMul" PerformanceTest.matMatMul
-    putStrLn ""
-    compile "../test/result2.hpp" "matMatMulTrans" PerformanceTest.matMatMulTrans
+    compile "../test/result.hpp" "eval" test
+    -- compile "../test/result1.hpp" "matMatMul" PerformanceTest.matMatMul
+    -- putStrLn ""
+    -- compile "../test/result2.hpp" "matMatMulTrans" PerformanceTest.matMatMulTrans
     
 
 getLeft :: Either a b -> a

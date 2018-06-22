@@ -103,12 +103,13 @@ swapBaseCase (o1,l1',o2,l2') f match = if varOccur then Nothing else Just $ fold
     varOccur = getAny $ fold $ findVarsInSubtrees matchVars (map (mGetSubtree match) f ++ concatMap (mGetArgList match) [l1',l2']) ++
                                findVarsInSubtrees (map fst $ l1_params) rest
 
--- zipSubdiv :: RepPattern
--- zipSubdiv = (MZipWithN "z1" (MStar "f"),
---              MFlatten "flat" (MZipWithN "z1" (MLam "l" (MZipWithN "z2" (MStar "f")))))
+zipSubdiv :: RepPattern
+zipSubdiv = (MZipWithN "z1" (MStar "f"),
+             MFlatten "flat" (MZipWithN "z1" (MLam "l" (MZipWithN "z2" (MStar "f")))))
 
--- zipSubdivTrans :: TypecheckT ∈ fields => Int -> RepTransform fields
--- zipSubdivTrans b = subdivBaseCase b ("z1","l","z2")
+zipSubdivTrans :: TypecheckT ∈ fields => Int -> RepTransform fields
+zipSubdivTrans b = fmap (\x -> foldl' (flip ($)) x updates) . subdivBaseCase b ("z1","l","z2") where
+    updates = [ insert "flat" $ Node Nothing $ Flatten 0 () ]
 
 rnzSubdiv :: RepPattern
 rnzSubdiv = (MRnZ "r1" (MStar "f") (MStar "g"),

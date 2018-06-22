@@ -28,6 +28,21 @@ struct Subdiv<0, B, List<P<D, S>, T>> {
 template<int I, int B, typename S>
 using subdiv_t = typename Subdiv<I, B, S>::type;
 
+template<int I, typename S> struct Flatten;
+
+template<int I, typename H, typename T>
+struct Flatten<I, List<H, T>> {
+    using type = List<H, typename Flatten<I - 1, T>::type>;
+};
+
+template<int D1, int S1, int D2, int S2, typename T>
+struct Flatten<0, List<P<D1, S1>, List<P<D2, S2>, T>>> {
+    using type = List<P<D1*D2,S2>, T>;
+};
+
+template<int I, typename S>
+using flatten_t = typename Flatten<I, S>::type;
+
 template<int D, typename S> struct Flip;
 
 template<int D, typename H, typename T>
@@ -53,6 +68,11 @@ auto flip(View<Ptr, T, Ds, IsRef> v) {
 template<int i, int b, typename Ptr, typename T, typename Ds, bool IsRef>
 auto subdiv(View<Ptr, T, Ds, IsRef> v) {
     return View<Ptr, T, subdiv_t<i, b, Ds>, IsRef>(v.data);
+}
+
+template<int i, typename Ptr, typename T, typename Ds, bool IsRef>
+auto flatten(View<Ptr, T, Ds, IsRef> v) {
+    return View<Ptr, T, flatten_t<i, Ds>, IsRef>(v.data);
 }
 
 template<typename L>

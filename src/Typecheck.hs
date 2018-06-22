@@ -57,6 +57,11 @@ typecheckAlg (_ ::< Subdiv i block (Left (FPower a b)))
     | otherwise = Left $ power' a $ 
                   take i b ++ [(div (fst $ b !! i) block, block*(snd $ b !! i)), (block,snd $ b !! i)] ++ drop (i+1) b
 
+typecheckAlg (_ ::< Flatten i (Left (FPower a b)))
+    | i < 0 || i >= (length b) - 1 = Right ["subdiv index out of range"]
+    | otherwise = Left $ power' a $ 
+                  take i b ++ (fst (b !! i) * fst (b !! (i+1)), snd (b !! (i+1))) : drop (i+2) b
+
 typecheckAlg (_ ::< node) = Right $ foldMap (either (const []) id) node
 
 typecheck :: Expr fields -> Either Error (Expr (TypecheckT ': fields))

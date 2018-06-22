@@ -15,6 +15,7 @@
 #include "evaluator15.hpp"
 #include "evaluator16.hpp"
 #include "evaluator17.hpp"
+#include "evaluator18.hpp"
 #include "tester.hpp"
 #include <cstdlib>
 
@@ -47,6 +48,7 @@ int main(int argc, char** argv) {
     case 15: return check(evaluator15(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
     case 16: return check(evaluator16(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
     case 17: return check(evaluator17(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
+    case 18: return check(evaluator18(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
     default: return 1;
     }
 }

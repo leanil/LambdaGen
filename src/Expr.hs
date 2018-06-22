@@ -20,7 +20,7 @@ data ExprF a
     -- TODO: support non-adjacent flips on C++ side
     | Flip { getDims :: (Int,Int), getBaseExpr :: a }
     | Subdiv { getDim :: Int, getBlockSize :: Int, getBaseExpr :: a }
-    -- TODO: Flatten
+    | Flatten { getDim :: Int, getBaseExpr :: a }
     deriving (Functor, Foldable, Traversable, Show)
 
 deriveEq1 ''ExprF
@@ -36,6 +36,7 @@ zipWithExprF f (RnZ a b c) (x:y:xs) = RnZ (f a x) (f b y) (zipWith f c xs)
 zipWithExprF f (ZipWithN a b) (x:xs) = ZipWithN (f a x) (zipWith f b xs)
 zipWithExprF f (Flip a b) (x:_) = Flip a (f b x)
 zipWithExprF f (Subdiv a b c) (x:_) = Subdiv a b (f c x)
+zipWithExprF f (Flatten a b) (x:_) = Flatten a (f b x)
 zipWithExprF _ a _ = castLeaf a
 
 zipExprF :: ExprF a -> [b] -> ExprF (a,b)
@@ -115,6 +116,9 @@ mkFlip a b = wrapExprF $ Flip a b
 
 subdiv :: Int -> Int -> Expr0 -> Expr0
 subdiv a b c = wrapExprF $ Subdiv a b c
+
+flatten :: Int -> Expr0 -> Expr0
+flatten a b = wrapExprF $ Flatten a b
 
 defaultStrides :: [Int] -> [Int]
 defaultStrides = tail . scanr (*) 1
