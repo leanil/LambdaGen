@@ -11,7 +11,12 @@ import Data.Map.Strict (Map, (!), empty, insert)
 import Data.Monoid (Sum(..), (<>))
 import Data.Vinyl (type (∈))
 
-newtype SubtreeSize = SubtreeSize (Sum Int) deriving (Monoid, Show)
+newtype SubtreeSize = SubtreeSize (Sum Int) deriving (Show)
+
+instance Semigroup SubtreeSize where
+    (SubtreeSize a) <> (SubtreeSize b) = SubtreeSize (a <> b)
+instance Monoid SubtreeSize where
+    mempty = SubtreeSize (Sum 0)
 
 subtreeSizeAlg :: Algebra (Expr fields) SubtreeSize
 

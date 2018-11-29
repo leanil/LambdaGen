@@ -103,8 +103,9 @@ merge (x:xs) (y:ys)
     | x > y  = y : merge (x:xs) ys
     | x == y = x : merge xs ys
 
+instance Semigroup ResultPack where
+    (ResultPack (a, b)) <> (ResultPack (c, d)) = ResultPack (a ++ c, b ++ d)
 instance Monoid ResultPack where
-    mappend (ResultPack (a, b)) (ResultPack (c, d)) = ResultPack (a ++ c, b ++ d)
     mempty = ResultPack ([], [])
 
 collectStgAlg :: (NodeId ∈ fields, Result ∈ fields, ParData ∈ fields, TypecheckT ∈ fields) => Algebra (Cofree ExprF (R fields)) ResultPack
