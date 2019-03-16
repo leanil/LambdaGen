@@ -5,7 +5,7 @@ module CodeGeneration where
 import Expr
 import Parallel
 import Recursion
-import Storage
+import StorageInliner
 import Type
 import Typecheck
 import Control.Arrow ((&&&))

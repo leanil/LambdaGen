@@ -1,12 +1,12 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, OverloadedStrings, TypeOperators, ViewPatterns #-}
 
-module CpuCodeGen where
+module CpuCodeGenInliner where
 
-import CppTemplate
+import CppTemplateInliner
 import Expr
 import Metrics
 import Recursion
-import Storage
+import StorageInliner
 import Type
 import Typecheck
 import Control.Comonad (extract)

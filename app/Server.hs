@@ -2,14 +2,14 @@
 
 module Server where
 
-import CpuCodeGen
+import CpuCodeGenInliner
 import Expr
 import Metrics
 import Parallel
 import Print
 import Recursion
 import Replace
-import Storage
+import StorageInliner
 import Transformation
 import Typecheck
 import Control.Comonad (extract)

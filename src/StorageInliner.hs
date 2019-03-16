@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, DuplicateRecordFields, FlexibleContexts, TupleSections, TypeOperators, ViewPatterns #-}
 
-module Storage where
+module StorageInliner where
 
 import Expr
 import Metrics

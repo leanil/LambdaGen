@@ -25,8 +25,8 @@ test1 = (mul (add (scl 2) (scl 3)) (scl 4), "20")
 test2 = (
     app
         (lam [x,y] (add x y ))
-        [(scl 5),
-        (mul (scl 4) (scl 3))],
+        [scl 5,
+        mul (scl 4) (scl 3)],
     "17")
 
 test3 = (
@@ -117,6 +117,40 @@ rSubdiv = mapFst (replace1TopDown rnzSubdiv (rnzSubdivTrans 1) . typecheck') mat
 rrSwap = mapFst (replace1TopDown rnzRnZSwap rnzRnZSwapTrans . typecheck') rSubdiv
 
 zSubdiv = mapFst (replace1TopDown zipSubdiv (zipSubdivTrans 1) . typecheck') matMatMul
+
+closureConvCheck :: Test
+closureConvCheck = (
+    let p = var "p" double
+        q = var "q" double
+        h = var "h" (arrow [double] double)
+        z = var "z" double in
+    app
+        (app
+            (lamBind [x] [(q, scl 8)]
+                (lamBind [y] [(p, scl 8), (h,
+                    lam [z] (add (add x z) y))]
+                    (add (mul (app h [scl 6]) p) q)))
+            [scl 2])
+        [scl 3],
+    "96")
+
+calleeCheck :: Test
+calleeCheck = (
+    let z = var "z" double
+        f = var "f" (arrow [double] double)
+        g name = var name (arrow [double] (arrow [double] double)) in
+    app
+        (app
+            (lamBind [x] [(f, lam [y] (add x y))]
+                (lamBind [y] [(g "g",lam [z] f), (g "h",lam [z] f)]
+                    (app
+                        (app (g "g") [scl 1])
+                        [app
+                            (app (g "h") [scl 1])
+                            [scl 1]])))
+            [scl 1])
+        [scl 1],
+    "2")
 
 funcTests :: [Test]
 funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, matMatMul, zzSwap, zrSwap, rzSwap, rrSwap, rSubdiv, zSubdiv]
