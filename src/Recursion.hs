@@ -6,6 +6,7 @@ import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree ((:<)))
 import qualified Control.Comonad.Trans.Cofree as CofreeT (CofreeF ((:<)))
 import Control.Comonad.Trans.Cofree (headF, tailF)
+import Control.Monad (Monad, (<=<))
 import Data.Functor.Foldable
 import Data.Proxy (Proxy(Proxy))
 import Data.Vinyl
@@ -19,11 +20,18 @@ type R = HList
 type Algebra t a = Base t a -> a
 type RAlgebra t a = Base t (t, a) -> a
 type CoAlgebra t a = a -> Base t a
+type MAlgebra t m a = Base t a -> m a
 
 annotate :: Functor f => 
             Algebra (Cofree f (R old)) new ->
             Algebra (Cofree f (R old)) (Cofree f (R (new ': old)))
 annotate alg (old ::< f) = (Identity (alg (old ::< fmap (fieldVal . extract) f)) :& old) :< f
+
+annotateM :: (Functor f, Monad m) => 
+            MAlgebra (Cofree f (R old)) m new ->
+            MAlgebra (Cofree f (R old)) m (Cofree f (R (new ': old)))
+annotateM alg (old ::< f) = fmap (\x -> (Identity x :& old) :< f) oldResult where
+    oldResult = alg (old ::< fmap (fieldVal . extract) f)
 
 annotatePara :: Functor f =>
                 RAlgebra (Cofree f (R old)) new ->
@@ -40,3 +48,9 @@ fieldVal = getIdentity . rget (Proxy :: Proxy a)
 
 getAnnot :: Cofree f a -> a
 getAnnot (a :< _) = a
+
+cataM :: (Monad m, Traversable (Base t), Recursive t) => (Base t a -> m a) -> t ->  m a
+cataM alg = c where c = alg <=< traverse c . project
+
+anaM :: (Monad m, Traversable (Base t), Corecursive t) => (a -> m (Base t a)) -> a -> m t
+anaM coalg = a where a = (return . embed) <=< traverse a <=< coalg

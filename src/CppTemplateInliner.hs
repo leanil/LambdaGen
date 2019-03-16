@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, QuasiQuotes, ViewPatterns #-}
 
-module CppTemplate where
+module CppTemplateInliner where
 
 import Data.Text (Text, append, init, concat, cons, intercalate, pack, snoc)
 import NeatInterpolation

@@ -1,7 +1,8 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators #-}
 
+import ClosureConversion
 import ConstFold
-import CpuCodeGen
+import CpuCodeGenInliner
 import Expr
 import FunctionalTest
 import Metrics
@@ -10,7 +11,7 @@ import qualified PerformanceTest
 import Print
 import Recursion
 import Replace
-import Storage
+import StorageClosureConv
 import Transformation
 import Typecheck
 import Control.Comonad (extract)
@@ -19,15 +20,19 @@ import Data.List (intercalate)
 import Data.Proxy (Proxy(Proxy))
 import Data.Vinyl
 
+import Data.Map.Strict
+import Control.Monad.State
+
 test :: Expr0
-test = fst zSubdiv
+test = fst calleeCheck -- closureConvCheck
 
 process :: TypecheckT ∈ fields => Expr fields -> 
-    Expr (ResultPack ': Result ': ParData ': NodeId ': SubtreeSize ': fields)
+    Expr (ResultPack ': Result ': ParData ': IsFreeVar ': Callee ': ClosureT ': NodeId ': SubtreeSize ': fields)
 process expr =
     collectStorage $
     assignStorage $
     parallelize 4 $
+    closureConversion $
     assignNodeId $
     cata constFoldAlg expr
 
@@ -37,9 +42,10 @@ compile fileName kernelName expr = do
     case fieldVal @TypecheckT $ extract tcd of
         (Left _) -> do
             let rep = replaceAll partialApp partialAppTrans tcd
+            print $ runState (cataM calleeAlg $ assignNodeId rep) empty 
             let prd = process $ typecheck' rep
-            writeFile fileName $ cpuCodeGen kernelName prd
-            putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) prd
+            --writeFile fileName $ cpuCodeGen kernelName prd
+            putStr $ printExpr (Proxy :: Proxy (R '[Callee, NodeId])) prd
         (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
             printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd

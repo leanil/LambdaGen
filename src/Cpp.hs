@@ -5,7 +5,7 @@ module Cpp where
 import CodeGeneration
 import Parallel
 import Recursion
-import Storage
+import StorageInliner
 import Data.Vinyl
 
 -- createEvaluator :: (CodeGenT ∈ fields, Result ∈ fields, ResultPack ∈ fields, ParData ∈ fields) => String -> R fields -> String

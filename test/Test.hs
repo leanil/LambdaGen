@@ -1,14 +1,14 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings, QuasiQuotes, TypeApplications, TypeFamilies #-}
 
 import ConstFold
-import CpuCodeGen
+import CpuCodeGenInliner
 import Expr
 import FunctionalTest
 import Metrics
 import Parallel
 import Recursion
 import Replace
-import Storage
+import StorageInliner
 import Transformation
 import Typecheck
 import Control.Comonad (extract)
@@ -17,6 +17,7 @@ import Data.Functor.Foldable (cata)
 import Data.Text (Text, concat, pack, unpack)
 import NeatInterpolation
 import Prelude hiding (concat)
+import System.Directory (createDirectoryIfMissing)
 import System.Exit (ExitCode(..), exitFailure)
 import System.IO (print)
 import System.Process (cwd, createProcess, proc, waitForProcess)
@@ -54,6 +55,7 @@ main = do
     writeFile "test/main.cpp" $ unpack $
         testCode (concat $ map (include . pack) evalIds)
                  (concat $ zipWith3 switch (map (pack . show) [1..]) (map pack evalIds) (map snd funcTests))
+    createDirectoryIfMissing True "test/build"
     createProcessAndExitOnFailure "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
     createProcessAndExitOnFailure "cmake" ["--build", "."]
     createProcessAndExitOnFailure "ctest" []
