@@ -11,12 +11,10 @@ import Control.Comonad.Cofree (Cofree(..))
 import Control.Monad.State (State, evalState, get, modify)
 import Data.Foldable (fold)
 import Data.Functor.Foldable (ana, cata)
-import Data.Map.Strict (Map, empty, findWithDefault, fromList, keysSet, union, singleton, toList, withoutKeys)
+import Data.Map.Strict (Map, empty, findWithDefault, insert, keysSet, union, singleton, toList, withoutKeys)
 import Data.Monoid (mconcat)
 import qualified Data.Set as S (Set, empty, fromList, member)
 import Data.Vinyl (type (∈))
-
-import Debug.Trace
 
 data ClosureT = ClosureT { getClosure :: Map String Type, getClosureList :: [(String, Map String Type)] }
 instance Show ClosureT where 
@@ -41,24 +39,19 @@ closureConvAlg (_ ::< node) = fold node
 type BoundNestedFun = Map String [Int]
 type Callee = (Maybe Int, [Int])
 
-traceMonad :: (Show a, Monad m) => String -> a -> m a
-traceMonad msg x = trace (msg ++ ": " ++ show x) (return x)
-
-calleeAlg :: NodeId ∈ fields => MAlgebra (Expr fields) (State BoundNestedFun) Callee
-calleeAlg (_ ::< Apply (_,x:xs) _) = return (Just x, xs)
-calleeAlg (r ::< Lambda _ binds (_,fs)) = do
-        x <- get
-        traceMonad ("lam1 " ++ show (getNodeId r)) x
-        modify (union $ fromList $ map (fmap snd) binds)
-        x <- get
-        traceMonad  ("lam2 " ++ show (getNodeId r)) x
-        return (Nothing, getNodeId r : fs)
-calleeAlg (r ::< Variable name _) = do
-    x <- get
-    traceMonad  ("var " ++ show (getNodeId r)) x
-    funMap <- get
-    return (Nothing, findWithDefault [] name funMap)
-calleeAlg _ = return (Nothing, [])
+calleeAlg :: (NodeId ∈ fields, LetId ∈ fields) => MAlgebra (Expr fields) (State BoundNestedFun) Callee
+calleeAlg (r ::< node) = do
+    st <- get
+    let retval = case node of
+                    Apply (_,x:xs) _ -> (Just x, xs)
+                    Lambda _ _ (_,fs) -> (Nothing, getNodeId r : fs)
+                    Variable name _ -> (Nothing, findWithDefault [] name st)
+                    _ -> (Nothing, [])
+        mod = case (fieldVal r, retval) of
+                    (LetId (Just name), (_,xs)) -> insert name xs 
+                    _ -> id in do
+        modify mod
+        return retval
 
 newtype IsFreeVar = IsFreeVar Bool deriving Show
 
@@ -72,5 +65,5 @@ isFreeVarAlg (r :< node, closure) = IsFreeVar False ::< fmap (,newClosure) node 
         otherwise -> closure
     extractClosure (fieldVal -> ClosureT clMap _) = keysSet clMap
 
-closureConversion :: (TypecheckT ∈ fields, NodeId ∈ fields) => Expr fields -> Expr (IsFreeVar ': Callee ': ClosureT ': fields)
+closureConversion :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields) => Expr fields -> Expr (IsFreeVar ': Callee ': ClosureT ': fields)
 closureConversion = ana (annotateAna isFreeVarAlg) . (,S.empty) . (`evalState` empty) . cataM (annotateM calleeAlg) . cata (annotate closureConvAlg)

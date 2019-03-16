@@ -27,12 +27,13 @@ test :: Expr0
 test = fst calleeCheck -- closureConvCheck
 
 process :: TypecheckT ∈ fields => Expr fields -> 
-    Expr (ResultPack ': Result ': ParData ': IsFreeVar ': Callee ': ClosureT ': NodeId ': SubtreeSize ': fields)
+    Expr (ResultPack ': Result ': ParData ': IsFreeVar ': Callee ': ClosureT ': LetId ': NodeId ': fields)
 process expr =
     collectStorage $
     assignStorage $
     parallelize 4 $
     closureConversion $
+    assignLetId $
     assignNodeId $
     cata constFoldAlg expr
 
@@ -42,7 +43,6 @@ compile fileName kernelName expr = do
     case fieldVal @TypecheckT $ extract tcd of
         (Left _) -> do
             let rep = replaceAll partialApp partialAppTrans tcd
-            print $ runState (cataM calleeAlg $ assignNodeId rep) empty 
             let prd = process $ typecheck' rep
             --writeFile fileName $ cpuCodeGen kernelName prd
             putStr $ printExpr (Proxy :: Proxy (R '[Callee, NodeId])) prd
