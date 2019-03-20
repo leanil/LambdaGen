@@ -2,7 +2,7 @@
 
 import ClosureConversion
 import ConstFold
-import CpuCodeGenInliner
+import CpuCodeGenClosureConv
 import Expr
 import FunctionalTest
 import Metrics
@@ -24,18 +24,18 @@ import Data.Map.Strict
 import Control.Monad.State
 
 test :: Expr0
-test = fst calleeCheck -- closureConvCheck
+test = fst calleeCheck
 
 process :: TypecheckT ∈ fields => Expr fields -> 
-    Expr (ResultPack ': Result ': ParData ': IsFreeVar ': Callee ': ClosureT ': LetId ': NodeId ': fields)
-process expr =
-    collectStorage $
-    assignStorage $
-    parallelize 4 $
-    closureConversion $
-    assignLetId $
-    assignNodeId $
-    cata constFoldAlg expr
+    Expr (ResultPack ': Result ': ParData ': ParamSet ': IsFreeVar ': ClosureT ': Callee ': LetId ': NodeId ': fields)
+process =
+    collectStorage .
+    assignStorage .
+    parallelize 4 .
+    closureConversion .
+    assignLetId .
+    assignNodeId .
+    cata constFoldAlg
 
 compile :: String -> String -> Expr0 -> IO ()
 compile fileName kernelName expr = do
@@ -44,8 +44,8 @@ compile fileName kernelName expr = do
         (Left _) -> do
             let rep = replaceAll partialApp partialAppTrans tcd
             let prd = process $ typecheck' rep
-            --writeFile fileName $ cpuCodeGen kernelName prd
-            putStr $ printExpr (Proxy :: Proxy (R '[Callee, NodeId])) prd
+            writeFile fileName $ cpuCodeGen kernelName prd
+            putStr $ printExpr (Proxy :: Proxy (R '[Callee, ClosureT])) prd
         (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
             printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd

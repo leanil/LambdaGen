@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, TupleSections, TypeOperators, ViewPatterns #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, ScopedTypeVariables, TupleSections, TypeOperators, ViewPatterns #-}
 
 module ClosureConversion where 
 
@@ -16,7 +16,27 @@ import Data.Monoid (mconcat)
 import qualified Data.Set as S (Set, empty, fromList, member)
 import Data.Vinyl (type (∈))
 
-data ClosureT = ClosureT { getClosure :: Map String Type, getClosureList :: [(String, Map String Type)] }
+type BoundNestedFun = Map String [Int]
+data Callee = Callee { getCallee :: Maybe Int, getFunStack :: [Int] } deriving Show
+
+calleeAlg :: (NodeId ∈ fields, LetId ∈ fields) => MAlgebra (Expr fields) (State BoundNestedFun) Callee
+calleeAlg (r ::< node) = do
+    st <- get
+    let retval = case node of
+                    Apply (Callee _ (x:xs)) _ -> Callee (Just x) xs
+                    Lambda _ _ (Callee _ fs) -> Callee Nothing $ getNodeId r : fs
+                    Variable name _ -> Callee Nothing $ findWithDefault [] name st
+                    _ -> Callee Nothing []
+        mod = case (fieldVal r, retval) of
+                    (LetId (Just name), Callee _ xs) -> insert name xs 
+                    _ -> id in do
+        modify mod
+        return retval
+
+-- Id of a lambda or type of a tensor
+type ExType = Either Int Type
+data ClosureT = ClosureT { getClosure :: Map String ExType, getClosureList :: [(Int, Map String ExType)] }
+
 instance Show ClosureT where 
     show (ClosureT symbolMap closureList) = "ClosureT " ++ show closureList -- ++ show (toList symbolMap)
 
@@ -25,33 +45,22 @@ instance Semigroup ClosureT where
 instance Monoid ClosureT where 
     mempty = ClosureT empty []
 
-closureConvAlg :: (TypecheckT ∈ fields, NodeId ∈ fields) => Algebra (Expr fields) ClosureT
+closureConvAlg :: (TypecheckT ∈ fields, NodeId ∈ fields, Callee ∈ fields) => Algebra (Expr fields) ClosureT
 
-closureConvAlg (_ ::< Variable name ty) = ClosureT (singleton name ty) []
+closureConvAlg ((getFunStack . fieldVal -> x:_) ::< Variable name FArrow{}) = ClosureT (singleton name $ Left x) []
+closureConvAlg (_ ::< Variable name ty) = ClosureT (singleton name $ Right ty) []
 
 closureConvAlg (r ::< node@(Lambda params bindings body)) = ClosureT filtered closure where
-    closure = ("_cl" ++ show (getNodeId r), filtered) : getClosureList merged
+    closure = (getNodeId r, filtered) : getClosureList merged
     filtered = withoutKeys (getClosure merged) $ S.fromList (map fst params ++ map fst bindings)
     merged = fold node
 
 closureConvAlg (_ ::< node) = fold node
 
-type BoundNestedFun = Map String [Int]
-type Callee = (Maybe Int, [Int])
-
-calleeAlg :: (NodeId ∈ fields, LetId ∈ fields) => MAlgebra (Expr fields) (State BoundNestedFun) Callee
-calleeAlg (r ::< node) = do
-    st <- get
-    let retval = case node of
-                    Apply (_,x:xs) _ -> (Just x, xs)
-                    Lambda _ _ (_,fs) -> (Nothing, getNodeId r : fs)
-                    Variable name _ -> (Nothing, findWithDefault [] name st)
-                    _ -> (Nothing, [])
-        mod = case (fieldVal r, retval) of
-                    (LetId (Just name), (_,xs)) -> insert name xs 
-                    _ -> id in do
-        modify mod
-        return retval
+getExType :: (TypecheckT ∈ fields, Callee ∈ fields) => R fields -> ExType
+getExType r = case (getType r) of
+    FArrow{}  -> Left $ head $ getFunStack $ fieldVal r
+    otherwise -> Right $ getType r
 
 newtype IsFreeVar = IsFreeVar Bool deriving Show
 
@@ -65,5 +74,20 @@ isFreeVarAlg (r :< node, closure) = IsFreeVar False ::< fmap (,newClosure) node 
         otherwise -> closure
     extractClosure (fieldVal -> ClosureT clMap _) = keysSet clMap
 
-closureConversion :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields) => Expr fields -> Expr (IsFreeVar ': Callee ': ClosureT ': fields)
-closureConversion = ana (annotateAna isFreeVarAlg) . (,S.empty) . (`evalState` empty) . cataM (annotateM calleeAlg) . cata (annotate closureConvAlg)
+newtype ParamSet = ParamSet (S.Set String) deriving Show
+
+paramSetAlg :: CoAlgebra (Cofree ExprF ParamSet) (Expr fields, ParamSet)
+paramSetAlg (_ :< node, paramSet) = paramSet ::< fmap (,paramSet') node where
+    paramSet' = case node of
+        Lambda params binds _ -> ParamSet (S.fromList $ map fst params ++ map fst binds)
+        otherwise             -> paramSet
+
+getParamSet :: ParamSet ∈ fields => R fields -> S.Set String
+getParamSet (fieldVal -> ParamSet params) = params
+
+closureConversion :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields) => Expr fields -> Expr (ParamSet ': IsFreeVar ': ClosureT ': Callee ': fields)
+closureConversion = ana (annotateAna paramSetAlg) . (,ParamSet S.empty) .
+                    ana (annotateAna isFreeVarAlg) . (,S.empty) . 
+                    cata (annotate closureConvAlg) .
+                    (`evalState` empty) . cataM (annotateM calleeAlg)
+                    

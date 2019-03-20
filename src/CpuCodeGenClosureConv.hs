@@ -2,6 +2,7 @@
 
 module CpuCodeGenClosureConv where
 
+import Prelude hiding (null)
 import ClosureConversion
 import CppTemplateClosureConv
 import Expr
@@ -13,34 +14,36 @@ import Typecheck
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
 import Data.Functor.Foldable (para)
+import Data.Map.Strict (mapWithKey, toList, null)
+import Data.Maybe (fromJust)
+import Data.Set (member)
 import Data.Text (Text, append, pack, singleton, unpack)
 import Data.Vinyl
 
-data CpuCodeT = CpuCodeT { getCode :: Text, getFunctions :: [Text] } deriving Show
+data CpuCodeT = CpuCodeT { getCode :: Text, getFunctions :: [(Text,Text)] } deriving Show
 
-cpuCodeGenAlg :: (NodeId ∈ fields, Result ∈ fields, TypecheckT ∈ fields, IsFreeVar ∈ fields, ClosureT ∈ fields) => RAlgebra (Expr fields) CpuCodeT
+cpuCodeGenAlg :: (TypecheckT ∈ fields, NodeId ∈ fields, Callee ∈ fields, ClosureT ∈ fields, IsFreeVar ∈ fields, ParamSet ∈ fields, Result ∈ fields) => RAlgebra (Expr fields) CpuCodeT
 
---cpuCodeGenAlg ((fieldVal -> Std _ False _) ::< Scalar{}) = CpuCodeT ""
 cpuCodeGenAlg (_ ::< Scalar x) = CpuCodeT (pack $ show x) []
 
---cpuCodeGenAlg ((fieldVal -> Std _ False _) ::< View{}) = CpuCodeT ""
 cpuCodeGenAlg (_ ::< View name _ _) = CpuCodeT (pack name) []
 
---cpuCodeGenAlg ((fieldVal -> Std _ False _) ::< Variable{}) = CpuCodeT ""
-cpuCodeGenAlg (r ::< Variable name _) = CpuCodeT (pack $ closure ++ name) [] where 
-    closure = case fieldVal r of
-        IsFreeVar True -> "_cl."
-        otherwise      -> ""
+cpuCodeGenAlg ((fieldVal -> IsFreeVar free) ::< Variable name _) = CpuCodeT (pack $ closure ++ name) [] where 
+    closure = if free then "_cl." else ""
 
 cpuCodeGenAlg (_ ::< ScalarOp op (_,CpuCodeT codeA funA) (_,CpuCodeT codeB funB)) =
     CpuCodeT (scalarOpTemplate (singleton op) codeA codeB) (funA ++ funB)
 
--- cpuCodeGenAlg (_ ::< Apply (getParamNames -> pa,CpuCodeT a) (unzipCodes -> (evals,names))) =
---     CpuCodeT $ appTemplate evals a pa names where
+cpuCodeGenAlg (r ::< Apply (_,CpuCodeT codeLam funLam) (map snd -> args)) =
+    CpuCodeT (appTemplate (fromJust $ getCallee $ fieldVal r) codeLam $ map (\(CpuCodeT arg _) -> arg) args) $ foldr (\(CpuCodeT _ fs) funs -> funs ++ fs) funLam args
         
--- cpuCodeGenAlg (_ ::< Lambda _ binds (_,CpuCodeT a)) =
---     CpuCodeT $ lambdaTemplate evals names values a where
---         (evals, names, values) = unzip3 $ map (\(n,(r :< _,CpuCodeT b)) -> (b,pack n,getResultId r)) binds
+cpuCodeGenAlg (r ::< Lambda params binds (r' :< _,CpuCodeT code funs)) =
+    CpuCodeT (makeClosureTemplate vars) $ lambdaTemplate retT (getNodeId r) hasClosure params binds' code : funs' where
+        vars = toList $ mapWithKey (\name _ -> member name $ getParamSet r) $ getClosure $ fieldVal r
+        retT = getExType r'
+        hasClosure = not $ null $ getClosure $ fieldVal r
+        binds' = map (\(name, (r'' :< _,CpuCodeT code _)) -> (getExType r'', pack name, code)) binds
+        funs' = foldr (\(_,(_,CpuCodeT _ f)) fs -> fs ++ f) funs binds
 
 -- cpuCodeGenAlg (r ::< RnZ (getParamNames -> pa,CpuCodeT a) (getParamNames -> pb,CpuCodeT b) vs@(unzipCodes -> (evals,names))) =
 --     CpuCodeT $ rnzTemplate evals resultId temp (pack $ makeHofIdx r) (pack $ show $ getVecSize vs) a pa b pb names where
@@ -77,15 +80,12 @@ cpuCodeGenAlg (_ ::< ScalarOp op (_,CpuCodeT codeA funA) (_,CpuCodeT codeB funB)
 -- getParamNames :: Expr fields -> [Text]
 -- getParamNames (_ :< Lambda params _ _) = map (pack . fst) params
 
--- cpuCodeGen :: (NodeId ∈ fields, Result ∈ fields, ResultPack ∈ fields, TypecheckT ∈ fields, IsFreeVar ∈ fields, ClosureT ∈ fields) => 
---     String -> Expr fields -> String
--- cpuCodeGen evalName expr = unpack $ cpuEvaluatorTemplate (pack evalName) userData allocViews evalCode resultName where
---     ResultPack (alloc, user) = fieldVal $ extract expr
---     userData = map (\(BigVector (pack -> name) (pack -> dataId) mem) -> 
---         viewTemplate "double const*" "double" mem name ("(userData[\"" `append` dataId `append` "\"])")) user
---     allocViews = map (\(ResultStg (pack -> name) _ mem) -> viewTemplate "double*" "double" mem name "") alloc
---     CpuCodeT evalCode = para cpuCodeGenAlg expr
---     resultName = getResultId $ extract expr
+cpuCodeGen :: (TypecheckT ∈ fields, NodeId ∈ fields, Callee ∈ fields, ClosureT ∈ fields, IsFreeVar ∈ fields, ParamSet ∈ fields, Result ∈ fields, ResultPack ∈ fields) => 
+    String -> Expr fields -> String
+cpuCodeGen evalName expr = unpack $ cpuEvaluatorTemplate closures funs retT (pack evalName) code where
+    closures = map (fmap toList) $ getClosureList $ fieldVal $ extract expr
+    CpuCodeT code (reverse -> funs) = para cpuCodeGenAlg expr
+    retT = getType $ extract expr
 
 -- indent :: String -> String -> String
 -- indent tabs code = unlines (map (tabs++) (lines code))

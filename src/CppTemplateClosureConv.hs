@@ -2,118 +2,165 @@
 
 module CppTemplateClosureConv where
 
-import Data.Text (Text, append, init, concat, cons, intercalate, pack, snoc)
+import ClosureConversion
+import Type
+import Utility (tshow)
+import Control.Arrow ((***))
+import Data.Text (Text, append, concat, cons, init, intercalate, pack, snoc)
+import qualified Data.Text as T (null)
 import NeatInterpolation
 import Prelude hiding (init, concat)
 
 assignTemplate :: Text -> Text -> Text
-assignTemplate name value = 
-    [text|$name = $value;|]
+assignTemplate name value = [text|$name = $value;|]
+
+declTemplate :: Text -> Text -> Text
+declTemplate ty name = [text|$ty $name;|]
+
+initTemplate :: Text -> Text -> Text -> Text
+initTemplate ty name val = [text|$ty $name = $val;|]
 
 scalarOpTemplate :: Text -> Text -> Text -> Text
-scalarOpTemplate op lhs rhs = 
-    [text|$lhs $op $rhs|]
+scalarOpTemplate op lhs rhs = [text|($lhs) $op ($rhs)|]
 
-appTemplate :: [Text] -> Text -> [Text] -> [Text] -> Text
-appTemplate (concat -> evals) lambda params args = 
-    let setParams = makeAssignments params args in
+appTemplate :: Int -> Text -> [Text] -> Text
+appTemplate (lamIdToName -> name) closure args =
+    let args' = intercalate "," $ if T.null closure then args else closure : args in
+    [text|$name($args')|]
+
+makeClosureTemplate :: [(String, Bool)] -> Text
+makeClosureTemplate [] = ""
+makeClosureTemplate vars =
+    let vars' = intercalate ", " $ map (\(name,bound) -> append (if bound then "" else "_cl.") $ pack name) vars in
+    [text|{$vars'}|]
+
+paramTemplate :: (String,Type) -> Text
+paramTemplate (pack -> name,cppType -> ty) = [text|$ty $name|]
+
+lambdaTemplate :: ExType -> Int -> Bool -> [(String,Type)] -> [(ExType,Text,Text)] -> Text -> (Text,Text)
+lambdaTemplate (cppExType -> retT) lamId hasClosure params binds body =
+    let name = lamIdToName lamId
+        closure = if hasClosure then lamIdToClosure lamId `append` " _cl, " else ""
+        params' = intercalate ", " $ map paramTemplate params
+        binds' = concat $ map (\(ty,name,val) -> initTemplate (cppExType ty) name val) binds in
+    ([text|$retT $name($closure$params')|],
     [text|
-        $evals
-        $setParams
-        $lambda
-    |]
+        $binds'
+        return $body;
+    |])
 
-makeAssignments :: [Text] -> [Text] -> Text
-makeAssignments names values = concat $ zipWith assignTemplate (map (append "auto ") names) values
+lamIdToName :: Int -> Text
+lamIdToName = append "_lam" . tshow
 
--- TODO: let-bound expressions should allocate with a given name
--- The caller sets the parameter values.
-lambdaTemplate :: [Text] -> [Text] -> [Text] -> Text -> Text
-lambdaTemplate (concat -> evals) names values body =
-    let assigns = makeAssignments names values in
-    [text|
-        $evals
-        $assigns
-        $body
-    |]
+lamIdToClosure :: Int -> Text
+lamIdToClosure = append "_Cl" . tshow
 
-indexedVecs :: [Text] -> Text -> [Text]
-indexedVecs vs (cons '[' . (flip snoc) ']' -> idx) = map (`append` idx) vs
+cppType :: Type -> Text
+cppType FDouble = "double"
+cppType (FPower _ dims) = viewTypeTemplate "double*" "double" (unzip dims)
 
-rnzTemplate :: [Text] -> Text -> Text -> Text -> Text -> Text -> [Text] -> Text -> [Text] -> [Text] -> Text
-rnzTemplate (concat -> evalVecs) resultId temp idx size reducer red_params zipper zip_params args =
-    let setZipParams = makeAssignments zip_params (indexedVecs args idx) 
-        setRedParams = makeAssignments red_params [resultId,temp] in
-    [text|
-        $evalVecs
-        for (int $idx = 0; $idx < $size; ++$idx) {
-            $setZipParams
-            $zipper
-            if($idx) {
-                $setRedParams
-                $reducer
-            }
-            else
-                $resultId = $temp;
-        }
-    |]
+cppExType :: ExType -> Text
+cppExType = either lamIdToClosure cppType
 
-zipWithNTemplate :: [Text] -> Text -> Text -> Text -> [Text] -> [Text] -> Text
-zipWithNTemplate (concat -> evalVecs) idx size lambda params args =
-    let setParams =  makeAssignments params (indexedVecs args idx) in
-    [text|
-        $evalVecs
-        for (int $idx = 0; $idx < $size; ++$idx) {
-            $setParams
-            $lambda
-        }
-    |]
+-- indexedVecs :: [Text] -> Text -> [Text]
+-- indexedVecs vs (cons '[' . (flip snoc) ']' -> idx) = map (`append` idx) vs
 
-flipTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text
-flipTemplate rhsCode auto result idx1 idx2 rhsResult =
-    [text|
-        $rhsCode
-        $auto$result = flip<$idx1>($rhsResult);
-    |]
+-- rnzTemplate :: [Text] -> Text -> Text -> Text -> Text -> Text -> [Text] -> Text -> [Text] -> [Text] -> Text
+-- rnzTemplate (concat -> evalVecs) resultId temp idx size reducer red_params zipper zip_params args =
+--     let setZipParams = makeAssignments zip_params (indexedVecs args idx) 
+--         setRedParams = makeAssignments red_params [resultId,temp] in
+--     [text|
+--         $evalVecs
+--         for (int $idx = 0; $idx < $size; ++$idx) {
+--             $setZipParams
+--             $zipper
+--             if($idx) {
+--                 $setRedParams
+--                 $reducer
+--             }
+--             else
+--                 $resultId = $temp;
+--         }
+--     |]
 
-subdivTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text
-subdivTemplate rhsCode auto result idx block rhsResult =
-    [text|
-        $rhsCode
-        $auto$result = subdiv<$idx,$block>($rhsResult);
-    |]
+-- zipWithNTemplate :: [Text] -> Text -> Text -> Text -> [Text] -> [Text] -> Text
+-- zipWithNTemplate (concat -> evalVecs) idx size lambda params args =
+--     let setParams =  makeAssignments params (indexedVecs args idx) in
+--     [text|
+--         $evalVecs
+--         for (int $idx = 0; $idx < $size; ++$idx) {
+--             $setParams
+--             $lambda
+--         }
+--     |]
 
-flattenTemplate :: Text -> Text -> Text -> Text -> Text -> Text
-flattenTemplate rhsCode auto result idx rhsResult =
-    [text|
-        $rhsCode
-        $auto$result = flatten<$idx>($rhsResult);
-    |]
+-- flipTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text
+-- flipTemplate rhsCode auto result idx1 idx2 rhsResult =
+--     [text|
+--         $rhsCode
+--         $auto$result = flip<$idx1>($rhsResult);
+--     |]
+
+-- subdivTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text
+-- subdivTemplate rhsCode auto result idx block rhsResult =
+--     [text|
+--         $rhsCode
+--         $auto$result = subdiv<$idx,$block>($rhsResult);
+--     |]
+
+-- flattenTemplate :: Text -> Text -> Text -> Text -> Text -> Text
+-- flattenTemplate rhsCode auto result idx rhsResult =
+--     [text|
+--         $rhsCode
+--         $auto$result = flatten<$idx>($rhsResult);
+--     |]
 
 viewDimElemTemplate :: (Int, Int) -> Text
 viewDimElemTemplate (1,1) = ""
-viewDimElemTemplate (pack . show -> size, pack . show -> stride) =
+viewDimElemTemplate (tshow -> size, tshow -> stride) =
     init [text|P<$size,$stride>|]
 
 viewDimListTemplate :: ([Int], [Int]) -> Text
 viewDimListTemplate (intercalate ", " . map viewDimElemTemplate . uncurry zip -> dims) =
     [text|to_list_t<$dims>|]
 
-viewTemplate :: Text -> Text -> ([Int], [Int]) -> Text -> Text -> Text
-viewTemplate pointerT dataT (viewDimListTemplate -> dims) viewName dataName =
-    [text|View<$pointerT, $dataT, $dims> $viewName$dataName;|]
+viewTypeTemplate :: Text -> Text -> ([Int], [Int]) -> Text
+viewTypeTemplate pointerT dataT (viewDimListTemplate -> dims) =
+    [text|View<$pointerT, $dataT, $dims>|]
 
-cpuEvaluatorTemplate :: Text -> [Text] -> [Text] -> Text -> Text -> Text
-cpuEvaluatorTemplate evaluatorName (concat -> userData) (concat -> allocViews) evalCode resultName =
+viewTemplate :: Text -> Text -> ([Int], [Int]) -> Text -> Text -> Text
+viewTemplate pointerT dataT dims viewName dataName =
+    let viewT = viewTypeTemplate pointerT dataT dims in
+    [text|$viewT $viewName$dataName;|]
+
+closureTemplate :: Int -> [(String,ExType)] -> Text
+closureTemplate _ [] = ""
+closureTemplate (lamIdToClosure -> clName) vars =
+    let vars' = concat $ map (\(name,ty) -> declTemplate (cppExType ty) (pack name)) vars in
+    [text|struct $clName {
+        $vars'
+    };|]
+
+funDefTemplate :: Text -> Text -> Text
+funDefTemplate decl def = 
+    [text|$decl {
+        $def
+    }|]
+
+cpuEvaluatorTemplate :: [(Int,[(String,ExType)])] -> [(Text,Text)] -> Type -> Text -> Text -> Text
+cpuEvaluatorTemplate closures funs (cppType -> retT) evaluatorName code =
+    let closures' = concat $ map (uncurry closureTemplate) closures
+        funDefs = concat $ map (uncurry funDefTemplate) funs in
     [text|
         #include "View.h"
         #include <map>
         #include <string>
 
-        auto $evaluatorName(std::map<std::string, double*> userData) {
-            $userData
-            $allocViews
-            $evalCode
-            return $resultName;
+        $closures'
+
+        $funDefs
+
+        $retT $evaluatorName(std::map<std::string, double*> userData) {
+            return $code;
         }
     |]
