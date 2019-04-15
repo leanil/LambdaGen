@@ -6,7 +6,7 @@ import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree ((:<)))
 import qualified Control.Comonad.Trans.Cofree as CofreeT (CofreeF ((:<)))
 import Control.Comonad.Trans.Cofree (headF, tailF)
-import Control.Monad (Monad, (<=<))
+import Control.Monad (Monad, (<=<), liftM2)
 import Data.Functor.Foldable
 import Data.Proxy (Proxy(Proxy))
 import Data.Vinyl
@@ -21,6 +21,8 @@ type Algebra t a = Base t a -> a
 type RAlgebra t a = Base t (t, a) -> a
 type CoAlgebra t a = a -> Base t a
 type MAlgebra t m a = Base t a -> m a
+type MRAlgebra t m a = Base t (t, a) -> m a
+type MCoAlgebra t m a = a -> m (Base t a)
 
 annotate :: Functor f => 
             Algebra (Cofree f (R old)) new ->
@@ -41,10 +43,27 @@ annotatePara alg (old ::< f) = (Identity (alg (old ::< fmap (fmap (fieldVal . ex
 annotateAna :: Functor f =>
                CoAlgebra (Cofree f new) (Cofree f (R old), seed) -> 
                CoAlgebra (Cofree f (R (new ': old))) (Cofree f (R old), seed)
-annotateAna alg a@(old :< _,_) = (Identity (headF tmp) :& old) ::< tailF tmp where tmp = alg a
+annotateAna alg a@(old :< _,_) = appendFields old $ alg a
+
+annotateAnaM :: (Functor f, Monad m) =>
+               MCoAlgebra (Cofree f new) m (Cofree f (R old), seed) -> 
+               MCoAlgebra (Cofree f (R (new ': old))) m (Cofree f (R old), seed)
+annotateAnaM alg a@(old :< _,_) = fmap (appendFields old) $ alg a
+
+annotateAnaM2 :: (Functor f, Monad m) =>
+               (new -> boxed) ->
+               MCoAlgebra (Cofree f new) m (Cofree f (R old), seed) -> 
+               MCoAlgebra (Cofree f (R (boxed ': old))) m (Cofree f (R old), seed)
+annotateAnaM2 box alg a@(old :< _,_) = fmap (appendFields2 box old) $ alg a
+
+appendFields :: R old -> CofreeF f new b -> CofreeF f (R (new : old)) b
+appendFields old (new ::< node) = (Identity new :& old) ::< node
+
+appendFields2 :: (new -> boxed) -> R old -> CofreeF f new b -> CofreeF f (R (boxed : old)) b
+appendFields2 box old (new ::< node) = (Identity (box new) :& old) ::< node
 
 fieldVal :: a ∈ fields => R fields -> a
-fieldVal = getIdentity . rget (Proxy :: Proxy a)
+fieldVal = getIdentity . rget
 
 getAnnot :: Cofree f a -> a
 getAnnot (a :< _) = a
@@ -54,3 +73,8 @@ cataM alg = c where c = alg <=< traverse c . project
 
 anaM :: (Monad m, Traversable (Base t), Corecursive t) => (a -> m (Base t a)) -> a -> m t
 anaM coalg = a where a = (return . embed) <=< traverse a <=< coalg
+
+paraM:: (Monad m, Traversable (Base t), Recursive t) => (Base t (t, a) -> m a) -> t -> m a
+paraM alg = p where
+    p   = alg <=< traverse f . project
+    f t = liftM2 (,) (return t) (p t)

@@ -7,48 +7,80 @@ import ClosureConversion
 import CppTemplateClosureConv
 import Expr
 import Metrics
+import Naming
 import Recursion
 import StorageClosureConv
 import Type
 import Typecheck
+import Utility (tshow)
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
+import Control.Monad.State (State, evalState, get, modify, runState)
 import Data.Functor.Foldable (para)
 import Data.Map.Strict (mapWithKey, toList, null)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, catMaybes)
 import Data.Set (member)
 import Data.Text (Text, append, pack, singleton, unpack)
 import Data.Vinyl
 
-data CpuCodeT = CpuCodeT { getCode :: Text, getFunctions :: [(Text,Text)] } deriving Show
 
-cpuCodeGenAlg :: (TypecheckT ∈ fields, NodeId ∈ fields, Callee ∈ fields, ClosureT ∈ fields, IsFreeVar ∈ fields, ParamSet ∈ fields, Result ∈ fields) => RAlgebra (Expr fields) CpuCodeT
+data CpuCodeT = CpuCodeT { getEvals :: [Text], getFunctions :: [(Text,Text)] } deriving Show
+instance Semigroup CpuCodeT where (CpuCodeT evalA funA) <> (CpuCodeT evalB funB) = CpuCodeT (evalA ++ evalB) (funA ++ funB)
+instance Monoid CpuCodeT where mempty = CpuCodeT [] []
 
-cpuCodeGenAlg (_ ::< Scalar x) = CpuCodeT (pack $ show x) []
+cpuCodeGenAlg :: (TypecheckT ∈ fields, NodeId ∈ fields, Callee ∈ fields, ClosureT ∈ fields, IsFreeVar ∈ fields, ParamSet ∈ fields, HofSpecId ∈ fields, OwnStorage ∈ fields) =>
+ MRAlgebra (Expr fields) (State CpuCodeT) Text
 
-cpuCodeGenAlg (_ ::< View name _ _) = CpuCodeT (pack name) []
+cpuCodeGenAlg (_ ::< Scalar x) = return $ tshow x
 
-cpuCodeGenAlg ((fieldVal -> IsFreeVar free) ::< Variable name _) = CpuCodeT (pack $ closure ++ name) [] where 
-    closure = if free then "_cl." else ""
+cpuCodeGenAlg (r ::< View name dims strides) = 
+    return $ viewTemplate (tResultTensor $ getNodeId r) "double*" "double" dims strides (pack name)
 
-cpuCodeGenAlg (_ ::< ScalarOp op (_,CpuCodeT codeA funA) (_,CpuCodeT codeB funB)) =
-    CpuCodeT (scalarOpTemplate (singleton op) codeA codeB) (funA ++ funB)
+cpuCodeGenAlg ((fieldVal -> IsFreeVar free) ::< Variable name _) = 
+    return $ varTemplate name free
 
-cpuCodeGenAlg (r ::< Apply (_,CpuCodeT codeLam funLam) (map snd -> args)) =
-    CpuCodeT (appTemplate (fromJust $ getCallee $ fieldVal r) codeLam $ map (\(CpuCodeT arg _) -> arg) args) $ foldr (\(CpuCodeT _ fs) funs -> funs ++ fs) funLam args
+cpuCodeGenAlg (_ ::< ScalarOp op (_,codeA) (_,codeB)) =
+    return $ scalarOpTemplate (singleton op) codeA codeB
+
+cpuCodeGenAlg (r ::< Apply (_,textToMaybe -> lam) args) = do
+    modify $ (<> CpuCodeT evals [])
+    return $ appTemplate callee wrapped lam (map fst args') outPar where 
+        args' = map (\(r' :< _, arg) -> case getType r' of
+            FPower{} -> (tResultTensor $ getNodeId r', Just arg) where 
+            FDouble -> (arg, Nothing)) args
+        evals = catMaybes $ map snd args'
+        callee = head $ getCallee $ fieldVal r
+        (outPar,wrapped) = case (getType r, ownStorage $ fieldVal r) of
+                (FArrow{},_)     -> (Nothing, False)
+                (_, False)       -> (Just outParamName, False)
+                (FPower{}, True) -> (Just $ tResultTensor $ getNodeId r, False)
+                (FDouble, True)  -> (Nothing, True)
         
-cpuCodeGenAlg (r ::< Lambda params binds (r' :< _,CpuCodeT code funs)) =
-    CpuCodeT (makeClosureTemplate vars) $ lambdaTemplate retT (getNodeId r) hasClosure params binds' code : funs' where
-        vars = toList $ mapWithKey (\name _ -> member name $ getParamSet r) $ getClosure $ fieldVal r
+cpuCodeGenAlg (r ::< Lambda params binds (r' :< _,code)) = do
+    CpuCodeT evals _ <- get
+    let funs = lambdaTemplate retT (getNodeId r) hasClosure params binds' code bodyOwnsStorage
+        vars = toList $ mapWithKey (\name _ -> not $ member name $ getParamSet r) $ getClosure $ fieldVal r
         retT = getExType r'
         hasClosure = not $ null $ getClosure $ fieldVal r
-        binds' = map (\(name, (r'' :< _,CpuCodeT code _)) -> (getExType r'', pack name, code)) binds
-        funs' = foldr (\(_,(_,CpuCodeT _ f)) fs -> fs ++ f) funs binds
+        binds' = map (\(name, (r'' :< _,code)) -> letBindingTemplate (getExType r'') (pack name) code) binds ++ evals
+        bodyOwnsStorage = ownStorage $ fieldVal r'
+    modify $ (\(CpuCodeT _ fs) -> CpuCodeT [] (fs ++ funs))
+    return $ makeClosureTemplate vars
+    
 
--- cpuCodeGenAlg (r ::< RnZ (getParamNames -> pa,CpuCodeT a) (getParamNames -> pb,CpuCodeT b) vs@(unzipCodes -> (evals,names))) =
---     CpuCodeT $ rnzTemplate evals resultId temp (pack $ makeHofIdx r) (pack $ show $ getVecSize vs) a pa b pb names where
---         resultId = getResultId r
---         temp = append "tmp_" $ pack $ show $ getNodeId r
+cpuCodeGenAlg (r ::< RnZ (rR :< _,codeRed) (rZ :< _,codeZip) vecs) = do
+    modify $ (<> CpuCodeT evals [])
+    return $ rnzTemplate hofSpecId codeRed codeZip vecNames outParam where
+        evals = map snd vecs
+        hofSpecId = fromJust $ getHofSpec $ fieldVal r
+        -- redName = lamIdToName $ getNodeId rR
+        -- zipName = lamIdToName $ getNodeId rZ
+        vecNames = map (tResultTensor . getNodeId . extract . fst) vecs
+        outParam = case (getType r, ownStorage $ fieldVal r) of
+            (_, False)       -> Just outParamName
+            (FPower{}, True) -> Just $ tResultTensor $ getNodeId r
+            (FDouble, True)  -> Nothing
+
 
 -- cpuCodeGenAlg (r ::< ZipWithN (getParamNames -> pa,CpuCodeT a) vs@(unzipCodes -> (evals,names))) =
 --     CpuCodeT $ zipWithNTemplate evals (pack $ makeHofIdx r) (pack $ show $ getVecSize vs) a pa names
@@ -71,21 +103,17 @@ cpuCodeGenAlg (r ::< Lambda params binds (r' :< _,CpuCodeT code funs)) =
 --             Std _ True _ -> ""
 --             Std _ False _ -> "auto "            
 
--- unzipCodes :: Result ∈ fields => [(Expr fields,CpuCodeT)] -> ([Text],[Text])
--- unzipCodes = unzip . map (\(r :< _,CpuCodeT a) -> (a,getResultId r))
+textToMaybe :: Text -> Maybe Text
+textToMaybe "" = Nothing
+textToMaybe t = Just t
 
--- getVecSize :: TypecheckT ∈ fields => [(Expr fields,a)] -> Int
--- getVecSize (((getType -> FPower _ ((s,_):_)) :< _,_):_) = s
-
--- getParamNames :: Expr fields -> [Text]
--- getParamNames (_ :< Lambda params _ _) = map (pack . fst) params
-
-cpuCodeGen :: (TypecheckT ∈ fields, NodeId ∈ fields, Callee ∈ fields, ClosureT ∈ fields, IsFreeVar ∈ fields, ParamSet ∈ fields, Result ∈ fields, ResultPack ∈ fields) => 
-    String -> Expr fields -> String
-cpuCodeGen evalName expr = unpack $ cpuEvaluatorTemplate closures funs retT (pack evalName) code where
-    closures = map (fmap toList) $ getClosureList $ fieldVal $ extract expr
-    CpuCodeT code (reverse -> funs) = para cpuCodeGenAlg expr
-    retT = getType $ extract expr
+cpuCodeGen :: (TypecheckT ∈ fields, NodeId ∈ fields, Callee ∈ fields, ClosureT ∈ fields, IsFreeVar ∈ fields, ParamSet ∈ fields, HofSpecId ∈ fields, OwnStorage ∈ fields) => 
+    String -> Expr fields -> HofSpec -> [Storage] -> String
+cpuCodeGen evalName expr hofSpec storage =
+    unpack $ cpuEvaluatorTemplate closures funs retT (pack evalName) code where
+        closures = map (fmap toList) $ getClosureList $ fieldVal $ extract expr
+        (code, CpuCodeT evals funs) = runState (paraM cpuCodeGenAlg expr) mempty
+        retT = getType $ extract expr
 
 -- indent :: String -> String -> String
 -- indent tabs code = unlines (map (tabs++) (lines code))

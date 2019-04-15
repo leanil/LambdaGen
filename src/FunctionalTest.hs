@@ -152,5 +152,13 @@ calleeCheck = (
         [scl 1],
     "3")
 
+storageAllocCheck :: Test
+storageAllocCheck = (
+    let f = var "f" (arrow [double] double) in
+    app
+        (lamBind [y] [(f, lam [x] (mkMap (app sclAdd [x]) a))]
+            (mkMap f (app f [y])))
+        [scl 1],
+    "?")
 funcTests :: [Test]
 funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, matMatMul, zzSwap, zrSwap, rzSwap, rrSwap, rSubdiv, zSubdiv]

@@ -22,20 +22,16 @@ import Data.Vinyl
 
 import Data.Map.Strict
 import Control.Monad.State
+import LinAlg
 
 test :: Expr0
-test = fst calleeCheck
+test = mkRnZ sclAdd sclMul [a,b]
 
 process :: TypecheckT ∈ fields => Expr fields -> 
-    Expr (ResultPack ': Result ': ParData ': ParamSet ': IsFreeVar ': ClosureT ': Callee ': LetId ': NodeId ': fields)
-process =
-    collectStorage .
-    assignStorage .
-    parallelize 4 .
-    closureConversion .
-    assignLetId .
-    assignNodeId .
-    cata constFoldAlg
+    (Expr (OwnStorage ': HofSpecId ': ParamSet ': IsFreeVar ': ClosureT ': Callee ': LetId ': NodeId ': fields), HofSpec, [Storage])
+process expr = (expr'', hofSpec, storage) where
+    (expr'',storage) = assignStorage expr'
+    (expr',hofSpec) = closureConversion $ assignLetId $ assignNodeId $ cata constFoldAlg expr
 
 compile :: String -> String -> Expr0 -> IO ()
 compile fileName kernelName expr = do
@@ -43,9 +39,9 @@ compile fileName kernelName expr = do
     case fieldVal @TypecheckT $ extract tcd of
         (Left _) -> do
             let rep = replaceAll partialApp partialAppTrans tcd
-            let prd = process $ typecheck' rep
-            writeFile fileName $ cpuCodeGen kernelName prd
-            putStr $ printExpr (Proxy :: Proxy (R '[Callee, ClosureT])) prd
+            let (prd,hofSpec,storage) = process $ typecheck' rep
+            writeFile fileName $ cpuCodeGen kernelName prd hofSpec storage
+            putStr $ printExpr (Proxy :: Proxy (R '[ParamSet, ClosureT])) prd
         (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
             printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd

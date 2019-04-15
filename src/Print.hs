@@ -20,7 +20,7 @@ indentAlg :: CoAlgebra (Cofree ExprF (R (IndentT ': fields))) ((Cofree ExprF (R 
 indentAlg (r :< node, i) = (Identity i :& r) ::< fmap (,inc i) node where
     inc (IndentT ind) = IndentT $ ind+1
 
-printerAlg :: forall fields select . (IndentT ∈ fields, select ⊆ fields, RecAll Identity select Show) =>
+printerAlg :: forall fields select . (IndentT ∈ fields, select ⊆ fields, RecAll Identity select Show, RMap select, ReifyConstraint Show Identity select, RecordToList select) =>
     Proxy (R select) -> Algebra (Cofree ExprF (R fields)) String
 
 printerAlg _ (r ::< Scalar x) = mkTabs r ++ "Scalar " ++ show x ++ ": " ++ show (rcast r :: R select) ++ "\n"
@@ -47,7 +47,7 @@ printerAlg _ (r ::< Subdiv a b c) = mkTabs r ++ "Subdiv " ++ show a ++ " " ++ sh
 
 printerAlg _ (r ::< Flatten a b) = mkTabs r ++ "Flatten " ++ show a ++ ": " ++ show (rcast r :: R select) ++ "\n" ++ b
 
-printExpr :: (select ⊆ (IndentT : fields), RecAll Identity select Show) =>
+printExpr :: (select ⊆ (IndentT : fields), RecAll Identity select Show, RMap select, ReifyConstraint Show Identity select, RecordToList select) =>
      Proxy (R select) -> Cofree ExprF (R fields) ->  String
 printExpr s e = cata (printerAlg s) $ indent e
 

@@ -26,12 +26,12 @@ data ExprF a
 deriveEq1 ''ExprF
 
 castLeaf :: ExprF a -> ExprF b
-castLeaf = fmap (const undefined)
+castLeaf = fmap undefined
 
 zipWithExprF :: (a -> b -> c) -> ExprF a -> [b] -> ExprF c
 zipWithExprF f (ScalarOp op a b) (x:y:_) = ScalarOp op (f a x) (f b y)
 zipWithExprF f (Apply a b) (x:xs) = Apply (f a x) $ zipWith f b xs
-zipWithExprF f (Lambda a b c) (splitAt (length b) -> (xs,x:_)) = Lambda a (zipWith (\(s,p) q -> (s,f p q)) b xs) (f c x)
+zipWithExprF f (Lambda a b c) (x:xs) = Lambda a (zipWith (\(s,p) q -> (s,f p q)) b xs) (f c x)
 zipWithExprF f (RnZ a b c) (x:y:xs) = RnZ (f a x) (f b y) (zipWith f c xs)
 zipWithExprF f (ZipWithN a b) (x:xs) = ZipWithN (f a x) (zipWith f b xs)
 zipWithExprF f (Flip a b) (x:_) = Flip a (f b x)
