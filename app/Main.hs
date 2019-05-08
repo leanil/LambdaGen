@@ -25,13 +25,13 @@ import Control.Monad.State
 import LinAlg
 
 test :: Expr0
-test = mkRnZ sclAdd sclMul [a,b]
+test = fst test1
 
 process :: TypecheckT ∈ fields => Expr fields -> 
     (Expr (OwnStorage ': HofSpecId ': ParamSet ': IsFreeVar ': ClosureT ': Callee ': LetId ': NodeId ': fields), HofSpec, [Storage])
 process expr = (expr'', hofSpec, storage) where
     (expr'',storage) = assignStorage expr'
-    (expr',hofSpec) = closureConversion $ assignLetId $ assignNodeId $ cata constFoldAlg expr
+    (expr',hofSpec) = closureConversion $ assignLetId $ assignNodeId {-$ cata constFoldAlg-} expr
 
 compile :: String -> String -> Expr0 -> IO ()
 compile fileName kernelName expr = do

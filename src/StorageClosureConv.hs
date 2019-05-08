@@ -26,14 +26,15 @@ newtype OwnStorage = OwnStorage { ownStorage :: Bool }
 storageAlg :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields) => MCoAlgebra (Cofree ExprF Bool) (Writer [Storage]) (Expr fields, Bool)
 
 storageAlg (_ :< node, tag) | isLeafNode node = return $ tag ::< castLeaf node
-storageAlg (_ :< node@ScalarOp{}, _) = return $ True ::< fmap (,True) node
 storageAlg (r :< node, tag) = do
     tell $ case (getType r, tag) of 
         (ty@FPower{}, True) -> [Storage (getMemId r) ty]
         otherwise           -> []
     case node of
+        ScalarOp{} -> return $ tag ::< zipExprF node (repeat True)
         Apply{} -> return $ tag ::< zipExprF node (False : repeat True)
-        Lambda{} -> return $ True ::< zipExprF node (False : repeat True)
+        Lambda{} -> return $ True ::< zipExprF node (curried : repeat True) where
+            curried = case getType r of FArrow _ FArrow{} -> True; _ -> False
         ZipWithN{} -> return $ tag ::< zipExprF node (False : repeat True)
         RnZ _ zipper _ -> do
             tell $ [Storage (getMemId r ++ "_tmp") (to $ unfix $ getType $ extract zipper)]

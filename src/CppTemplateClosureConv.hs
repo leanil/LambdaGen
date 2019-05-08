@@ -13,6 +13,9 @@ import qualified Data.Text as T (null)
 import NeatInterpolation
 import Prelude hiding (concat)
 
+data CodeT = CodeT { getValue :: Text, getEval :: Text } -- evaulator code may be empty
+data StoreResult = OutParam | Tensor Text | LetBound Text | None
+
 assignTemplate :: Text -> Text -> Text
 assignTemplate name value = [text|$name = $value;|]
 
@@ -22,25 +25,52 @@ declTemplate ty name = [text|$ty $name;|]
 initTemplate :: Text -> Text -> Text -> Text
 initTemplate ty name val = [text|$ty $name = $val;|]
 
+scalarTemplate :: StoreResult -> Double -> CodeT
+scalarTemplate result (tshow -> x) = case result of
+        OutParam -> CodeT outParamName (assignTemplate outParamName x)
+        LetBound name -> CodeT name (initTemplate "double" name x)
+        None -> CodeT x ""
+
+viewTemplate :: StoreResult -> Text -> Text -> [Int] -> [Int] -> Text -> CodeT
+viewTemplate result pointerT dataT dims strides dataName = case result of
+    OutParam -> CodeT outParamName (assignTemplate outParamName code)
+    LetBound name -> CodeT name [text|$viewT $name(userData[$dataName]);|]
+    None -> CodeT code ""
+    where
+        viewT = viewTypeTemplate pointerT dataT (dims,strides)
+        code = [text|$viewT(userData[$dataName])|]
+
 varTemplate :: String -> Bool -> Text
 varTemplate (pack -> name) free = stripEnd $ if free then [text|$closureParamName.$name|] else [text|$name|]
 
-scalarOpTemplate :: Text -> Text -> Text -> Text
-scalarOpTemplate op lhs rhs = [text|($lhs) $op ($rhs)|]
+scalarOpTemplate :: Text -> StoreResult -> Text -> Text -> Text -> CodeT
+scalarOpTemplate eval result op lhs rhs = case result of
+    OutParam -> CodeT outParamName (append eval $ assignTemplate outParamName code)
+    LetBound name -> CodeT name (append eval $ initTemplate "double" name code)
+    None -> CodeT code eval
+    where
+        code = [text|($lhs) $op ($rhs)|]
 
-appTemplate :: Int -> Bool -> Maybe Text -> [Text] -> Maybe Text -> Text
-appTemplate lamId wrapped closure args outParam = stripEnd [text|$name($args')$seCol|] where 
-    name = lamIdToName lamId `append` if wrapped then wrapperSuffix else ""
-    args' = intercalate ", " $ maybeToList closure ++ args ++ maybeToList outParam
-    seCol = if isJust outParam then ";" else ""
-
+appTemplate :: Text -> StoreResult -> Int -> Text -> [Text] -> CodeT
+appTemplate eval result lamId closure args = case outParam of
+    Just name -> CodeT name (append eval [text|$code;|])
+    _ -> case result of
+        None -> CodeT eval code
+        LetBound name -> CodeT name (append eval $ initTemplate "double" name code)
+    where
+        outParam = case result of
+            OutParam -> Just outParamName
+            Tensor name -> Just name
+            _ -> Nothing
+        code = [text|$name($args');|]
+        name = lamIdToName lamId `append` if isJust outParam then "" else wrapperSuffix
+        args' = intercalate ", " $ closure : args ++ maybeToList outParam
+        
 -- | The Bool value tells if the variable is from the parameter set of the enclosing lambda (or inherited from it's closure).
 makeClosureTemplate :: [(String, Bool)] -> Text
-makeClosureTemplate [] = ""
-makeClosureTemplate vars = [text|{$vars'}|] where
+makeClosureTemplate vars = stripEnd $ [text|{$vars'}|] where
     vars' = intercalate ", " $ map (uncurry varTemplate) vars
     
-
 paramTemplate :: (Text,Text) -> Text
 paramTemplate (name,ty) = stripEnd [text|$ty $name|]
 
@@ -49,8 +79,8 @@ paramTemplate (name,ty) = stripEnd [text|$ty $name|]
 --   On the other hand, Lambdas (closures) should be returned regularly, to make nested calls easier.
 --   Scalar valued lambdas can be used in both kinds of contexts.
 
-lambdaTemplate :: ExType -> Int -> Bool -> [(String,Type)] -> [Text] -> Text -> Bool -> [(Text,Text)]
-lambdaTemplate retT lamId hasClosure (map (mapFst pack) -> params) (concat -> binds) body bodyOwnsStorage =
+lambdaTemplate :: ExType -> Int -> [(String,Type)] -> [Text] -> Text -> [(Text,Text)]
+lambdaTemplate retT lamId (map (mapFst pack) -> params) (concat -> binds) body =
     [([text|
         $templateParams
         $retT' $name($params'')
@@ -60,8 +90,7 @@ lambdaTemplate retT lamId hasClosure (map (mapFst pack) -> params) (concat -> bi
     |])] ++ wrapper where
         templateParams = templateParamsTemplate templateCnt
         (retT',outParam,return) = case retT of
-            Right FDouble -> ("void", [(outParamName,power double [])],
-                if bodyOwnsStorage then [text|$outParamName = $body;|] else body)
+            Right FDouble -> ("void", [(outParamName,power double [])], body)
             Right ty@FPower{} -> ("void", [(outParamName,ty)],body)
             Left{}   -> (cppExType retT, [], [text|return $body;|])
         name = lamIdToName lamId
@@ -72,8 +101,7 @@ lambdaTemplate retT lamId hasClosure (map (mapFst pack) -> params) (concat -> bi
         (params',templateCnt) = foldr hideParams ([],0) $ params ++ outParam where
             hideParams (name,FDouble) (ps,cnt) = ((name,"double"):ps, cnt)
             hideParams (name,FPower{}) (ps,cnt) = ((name,templateArgName $ cnt+1):ps, cnt+1)
-        closure = if hasClosure then [(closureParamName,lamIdToClosure lamId)] else []
-        
+        closure = [(closureParamName,lamIdToClosure lamId)]
 
 templateParamsTemplate :: Int -> Text
 templateParamsTemplate 0   = ""
@@ -175,13 +203,7 @@ viewTypeTemplate :: Text -> Text -> ([Int], [Int]) -> Text
 viewTypeTemplate pointerT dataT (viewDimListTemplate -> dims) =
     [text|View<$pointerT, $dataT, $dims>|]
 
-viewTemplate :: Text -> Text -> Text -> [Int] -> [Int] -> Text -> Text
-viewTemplate varName pointerT dataT dims strides dataName =
-    [text|$viewT $varName(userData[$dataName]);|] where
-        viewT = viewTypeTemplate pointerT dataT (dims,strides)
-
 closureTemplate :: Int -> [(String,ExType)] -> Text
-closureTemplate _ [] = ""
 closureTemplate (lamIdToClosure -> clName) vars =
     let vars' = concat $ map (\(name,ty) -> declTemplate (cppExType ty) (pack name)) vars in
     [text|struct $clName {

@@ -24,6 +24,14 @@ type MAlgebra t m a = Base t a -> m a
 type MRAlgebra t m a = Base t (t, a) -> m a
 type MCoAlgebra t m a = a -> m (Base t a)
 
+annotateCata :: Functor f => ((t, f new) -> new) -> ((t, f (Cofree f (t, new))) -> Cofree f (t, new))
+annotateCata alg (old, f) = (old,new) :< f where
+    new = alg (old, fmap (\((_,n) :< _) -> n) f)
+
+annotateAna' :: Functor f => ((Cofree f t, seed) -> (new, f (Cofree f t, seed))) -> ((Cofree f t, seed) -> ((t, new), f (Cofree f t, seed)))
+annotateAna' alg a@(old :< _, _) = ((old, new), f) where
+    (new, f) = alg a
+    
 annotate :: Functor f => 
             Algebra (Cofree f (R old)) new ->
             Algebra (Cofree f (R old)) (Cofree f (R (new ': old)))

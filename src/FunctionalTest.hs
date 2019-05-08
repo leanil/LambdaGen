@@ -160,5 +160,11 @@ storageAllocCheck = (
             (mkMap f (app f [y])))
         [scl 1],
     "?")
+
+rnzCheck :: Test
+rnzCheck = (
+    mkRnZ sclAdd sclMul [a,b],
+    "14")
+
 funcTests :: [Test]
 funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, matMatMul, zzSwap, zrSwap, rzSwap, rrSwap, rSubdiv, zSubdiv]
