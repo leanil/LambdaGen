@@ -32,7 +32,7 @@ storageAlg (r :< node, tag) = do
         otherwise           -> []
     case node of
         ScalarOp{} -> return $ tag ::< zipExprF node (repeat True)
-        Apply{} -> return $ tag ::< zipExprF node (False : repeat True)
+        Apply{} -> return $ tag ::< zipExprF node (True : repeat True)
         Lambda{} -> return $ True ::< zipExprF node (curried : repeat True) where
             curried = case getType r of FArrow _ FArrow{} -> True; _ -> False
         ZipWithN{} -> return $ tag ::< zipExprF node (False : repeat True)

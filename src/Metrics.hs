@@ -48,7 +48,7 @@ makeSymbolsUnique = ana alg . (,empty) . assignNodeId where
     alg (r :< Variable name t, m) = r ::< Variable (m ! name) t
     alg (r :< node,m) = r ::< zipExprF node (repeat m)
 
-newtype LetId = LetId (Maybe String)
+newtype LetId = LetId { getLetId :: Maybe String } deriving Show
 assignLetId :: Expr fields -> Expr (LetId ': fields)
 assignLetId = ana (annotateAna alg) . (,Nothing) where
     alg (_ :< Lambda params binds body, name) = LetId name ::< Lambda params (map (\(name, exp) -> (name, (exp, Just name))) binds) (body, Nothing)

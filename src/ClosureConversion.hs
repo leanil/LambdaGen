@@ -60,7 +60,7 @@ getExType r = case (getType r) of
     FArrow{}  -> Left $ head $ getFunStack $ fieldVal r
     otherwise -> Right $ getType r
 
-newtype IsFreeVar = IsFreeVar Bool deriving Show
+newtype IsFreeVar = IsFreeVar { isFreeVar :: Bool } deriving Show
 
 isFreeVarAlg :: ClosureT ∈ fields => CoAlgebra (Cofree ExprF IsFreeVar) (Expr fields, Set String)
 

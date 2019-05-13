@@ -38,10 +38,18 @@ viewTemplate result pointerT dataT dims strides dataName = case result of
     None -> CodeT code ""
     where
         viewT = viewTypeTemplate pointerT dataT (dims,strides)
-        code = [text|$viewT(userData[$dataName])|]
+        code = stripEnd [text|$viewT(userData[$dataName])|]
 
 varTemplate :: String -> Bool -> Text
 varTemplate (pack -> name) free = stripEnd $ if free then [text|$closureParamName.$name|] else [text|$name|]
+
+variableTemplate :: Maybe String -> StoreResult -> String -> Bool -> CodeT
+variableTemplate letId result name free = case letId of
+    Just (pack -> letId) -> CodeT letId (initTemplate "auto" letId code) -- TODO: store template type of function parameter tensors and use it here. Or clear strides from view type.
+    Nothing -> case result of
+        OutParam -> CodeT outParamName (assignTemplate outParamName code)
+        _ -> CodeT code ""
+    where code = varTemplate name free
 
 scalarOpTemplate :: Text -> StoreResult -> Text -> Text -> Text -> CodeT
 scalarOpTemplate eval result op lhs rhs = case result of
@@ -49,27 +57,31 @@ scalarOpTemplate eval result op lhs rhs = case result of
     LetBound name -> CodeT name (append eval $ initTemplate "double" name code)
     None -> CodeT code eval
     where
-        code = [text|($lhs) $op ($rhs)|]
+        code = stripEnd [text|($lhs) $op ($rhs)|]
 
 appTemplate :: Text -> StoreResult -> Int -> Text -> [Text] -> CodeT
 appTemplate eval result lamId closure args = case outParam of
     Just name -> CodeT name (append eval [text|$code;|])
     _ -> case result of
-        None -> CodeT eval code
+        None -> CodeT code eval
         LetBound name -> CodeT name (append eval $ initTemplate "double" name code)
     where
         outParam = case result of
             OutParam -> Just outParamName
             Tensor name -> Just name
             _ -> Nothing
-        code = [text|$name($args');|]
-        name = lamIdToName lamId `append` if isJust outParam then "" else wrapperSuffix
+        code = stripEnd $ [text|$funName($args')|]
+        funName = lamIdToName lamId `append` if isJust outParam then "" else wrapperSuffix
         args' = intercalate ", " $ closure : args ++ maybeToList outParam
         
 -- | The Bool value tells if the variable is from the parameter set of the enclosing lambda (or inherited from it's closure).
-makeClosureTemplate :: [(String, Bool)] -> Text
-makeClosureTemplate vars = stripEnd $ [text|{$vars'}|] where
-    vars' = intercalate ", " $ map (uncurry varTemplate) vars
+makeClosureTemplate :: StoreResult -> Int -> [(String, Bool)] -> CodeT
+makeClosureTemplate result (lamIdToClosure -> ty) vars = case result of
+    LetBound name -> CodeT name $ initTemplate ty name code
+    None          -> CodeT code ""
+    where
+        code = stripEnd [text|{$vars'}|]
+        vars' = intercalate ", " $ map (uncurry varTemplate) vars
     
 paramTemplate :: (Text,Text) -> Text
 paramTemplate (name,ty) = stripEnd [text|$ty $name|]
@@ -79,19 +91,19 @@ paramTemplate (name,ty) = stripEnd [text|$ty $name|]
 --   On the other hand, Lambdas (closures) should be returned regularly, to make nested calls easier.
 --   Scalar valued lambdas can be used in both kinds of contexts.
 
-lambdaTemplate :: ExType -> Int -> [(String,Type)] -> [Text] -> Text -> [(Text,Text)]
-lambdaTemplate retT lamId (map (mapFst pack) -> params) (concat -> binds) body =
+lambdaTemplate :: ExType -> Int -> [(String,Type)] -> Text -> Text -> [(Text,Text)]
+lambdaTemplate retT lamId (map (mapFst pack) -> params) eval body =
     [([text|
         $templateParams
-        $retT' $name($params'')
-    |],[text|
-        $binds
-        $return
-    |])] ++ wrapper where
+        $retT' $name($params'')|],
+    [text|
+        $eval
+        $return|])] ++ wrapper
+    where
         templateParams = templateParamsTemplate templateCnt
         (retT',outParam,return) = case retT of
-            Right FDouble -> ("void", [(outParamName,power double [])], body)
-            Right ty@FPower{} -> ("void", [(outParamName,ty)],body)
+            Right FDouble -> ("void", [(outParamName,power double [])], "")
+            Right ty@FPower{} -> ("void", [(outParamName,ty)],"")
             Left{}   -> (cppExType retT, [], [text|return $body;|])
         name = lamIdToName lamId
         params'' = intercalate ", " $ map paramTemplate $ closure ++ params'
@@ -108,20 +120,16 @@ templateParamsTemplate 0   = ""
 templateParamsTemplate cnt = [text|template<$params>|] where
     params = intercalate ", " $ map (append "typename " . templateArgName) [1..cnt]
 
-letBindingTemplate :: ExType -> Text -> Text -> Text
-letBindingTemplate (Right FPower{}) _ code = code
-letBindingTemplate ty name code = initTemplate (cppExType ty) name code
-
 wrapperFunctionTemplate :: Int -> Text -> [(Text,Text)] -> (Text,Text)
 wrapperFunctionTemplate templateCnt funName params =
     ([text|
         $templateParams
-        double $funName'($params')
-    |],[text|
+        double $funName'($params')|],
+    [text|
         double result;
         $funName($args, View<double*, double, to_list_t<>, true>(&result));
-        return result;
-    |]) where
+        return result;|])
+    where
         templateParams = templateParamsTemplate templateCnt
         funName' = append funName wrapperSuffix
         params' = intercalate ", " $ map paramTemplate params
@@ -216,10 +224,8 @@ funDefTemplate decl def =
         $def
     }|]
 
-cpuEvaluatorTemplate :: [(Int,[(String,ExType)])] -> [(Text,Text)] -> Type -> Text -> Text -> Text
-cpuEvaluatorTemplate closures funs (cppType -> retT) evaluatorName code =
-    let closures' = concat $ map (uncurry closureTemplate) closures
-        funDefs = concat $ map (uncurry funDefTemplate) funs in
+cpuEvaluatorTemplate :: [(Int,[(String,ExType)])] -> [(Text,Text)] -> Type -> Text -> Text -> Text -> Text
+cpuEvaluatorTemplate closures funs retT evaluatorName eval code =
     [text|
         #include "View.h"
         #include <map>
@@ -229,7 +235,15 @@ cpuEvaluatorTemplate closures funs (cppType -> retT) evaluatorName code =
 
         $funDefs
 
-        $retT $evaluatorName(std::map<std::string, double*> userData) {
-            return $code;
+        $retT' $evaluatorName(std::map<std::string, double*> userData) {
+            $eval
+            $return
         }
     |]
+    where
+        closures' = concat $ map (uncurry closureTemplate) closures
+        funDefs = concat $ map (uncurry funDefTemplate) funs
+        retT' = cppType retT
+        return = case retT of
+            FDouble -> [text|return $code;|]
+            _       -> ""

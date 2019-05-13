@@ -2,7 +2,7 @@
 
 module CpuCodeGenClosureConv where
 
-import Prelude hiding (null)
+import Prelude hiding (filter, null)
 import ClosureConversion
 import CppTemplateClosureConv
 import Expr
@@ -21,7 +21,7 @@ import Data.Functor.Foldable (para)
 import Data.Map.Strict (mapWithKey, toList, null)
 import Data.Maybe (fromJust, catMaybes)
 import Data.Set (member)
-import Data.Text (Text, append, pack, singleton, unpack)
+import Data.Text (Text, append, filter, pack, singleton, unpack)
 import Data.Vinyl
 
 
@@ -45,16 +45,20 @@ cpuCodeGenAlg (r ::< node) =
 
         View name dims strides -> return $ viewTemplate resultName "double*" "double" dims strides (pack name)
 
+        Variable name _ -> return $ variableTemplate (getLetId $ fieldVal r) resultName name (isFreeVar $ fieldVal r)
+
         ScalarOp op (_,codeA) (_,codeB) -> return $ scalarOpTemplate eval resultName (singleton op) codeA codeB
 
         Apply (_,lam) (map snd -> args) -> return $ appTemplate eval resultName callee lam args where
             callee = head $ getCallee $ fieldVal r
 
-        -- Lambda params binds (r' :< _,code) -> do
-        --     modify $ (++ funs)
-        --     return $ CodeT code "" where
-        --         funs = lambdaTemplate (getExType r') (getNodeId r) params binds' eval
-        --         code = makeClosureTemplate vars
+        Lambda params binds (r' :< _,code) -> do
+            modify $ (++ funs)
+            return $ makeClosureTemplate resultName (getNodeId r) closureVars
+            where
+                funs = lambdaTemplate (getExType r') (getNodeId r) params eval code
+                closureVars = toList $ mapWithKey (\name _ -> not $ member name $ getParamSet r) $ getClosure $ fieldVal r
+
         
 -- cpuCodeGenAlg (r ::< Lambda params binds (r' :< _,code)) = do
 --     CpuCodeT evals _ <- get
@@ -106,11 +110,11 @@ textToMaybe "" = Nothing
 textToMaybe t = Just t
 
 cpuCodeGen :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields, Callee ∈ fields, ClosureT ∈ fields, IsFreeVar ∈ fields, ParamSet ∈ fields, HofSpecId ∈ fields, OwnStorage ∈ fields) => 
-    String -> Expr fields -> HofSpec -> [Storage] -> String
-cpuCodeGen evalName expr hofSpec storage =
-    unpack $ cpuEvaluatorTemplate closures funs retT (pack evalName) code where
+    String -> Expr fields -> HofSpec -> [Storage] -> Text
+cpuCodeGen evalName expr hofSpec storage = filter (\c -> c /= '\r') genCode where
+        genCode = cpuEvaluatorTemplate closures funs retT (pack evalName) eval code
         closures = map (fmap toList) $ getClosureList $ fieldVal $ extract expr
-        (CodeT code _, funs) = runState (paraM cpuCodeGenAlg expr) mempty
+        (CodeT code eval, funs) = runState (paraM cpuCodeGenAlg expr) mempty
         retT = getType $ extract expr
 
 -- indent :: String -> String -> String

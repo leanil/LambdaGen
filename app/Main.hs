@@ -18,6 +18,7 @@ import Control.Comonad (extract)
 import Data.Functor.Foldable (cata)
 import Data.List (intercalate)
 import Data.Proxy (Proxy(Proxy))
+import Data.Text.IO as T (writeFile)
 import Data.Vinyl
 
 import Data.Map.Strict
@@ -25,7 +26,7 @@ import Control.Monad.State
 import LinAlg
 
 test :: Expr0
-test = fst test1
+test = fst calleeCheck
 
 process :: TypecheckT ∈ fields => Expr fields -> 
     (Expr (OwnStorage ': HofSpecId ': ParamSet ': IsFreeVar ': ClosureT ': Callee ': LetId ': NodeId ': fields), HofSpec, [Storage])
@@ -40,8 +41,8 @@ compile fileName kernelName expr = do
         (Left _) -> do
             let rep = replaceAll partialApp partialAppTrans tcd
             let (prd,hofSpec,storage) = process $ typecheck' rep
-            writeFile fileName $ cpuCodeGen kernelName prd hofSpec storage
-            putStr $ printExpr (Proxy :: Proxy (R '[ParamSet, ClosureT])) prd
+            T.writeFile fileName $ cpuCodeGen kernelName prd hofSpec storage
+            putStr $ printExpr (Proxy :: Proxy (R '[])) prd
         (Right errors) ->
             putStr $ intercalate "\n" errors ++ "\n\n" ++
             printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd
