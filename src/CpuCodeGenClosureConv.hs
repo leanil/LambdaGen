@@ -15,7 +15,7 @@ import Typecheck
 import Utility (tshow)
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
-import Control.Monad.State (State, evalState, get, modify, runState)
+import Control.Monad.Writer.Lazy (Writer, runWriter, tell)
 import Data.Foldable (fold)
 import Data.Functor.Foldable (para)
 import Data.Map.Strict (mapWithKey, toList, null)
@@ -27,9 +27,8 @@ import Data.Vinyl
 
 type Functions = [(Text,Text)]
 
--- TODO: State to Writer
 cpuCodeGenAlg :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields, Callee ∈ fields, ClosureT ∈ fields, IsFreeVar ∈ fields, ParamSet ∈ fields, HofSpecId ∈ fields, OwnStorage ∈ fields) =>
- MRAlgebra (Expr fields) (State Functions) CodeT
+ MRAlgebra (Expr fields) (Writer Functions) CodeT
 
 cpuCodeGenAlg (r ::< node) =
     let eval = fold $ fmap (getEval . snd) node
@@ -53,22 +52,13 @@ cpuCodeGenAlg (r ::< node) =
             callee = head $ getCallee $ fieldVal r
 
         Lambda params binds (r' :< _,code) -> do
-            modify $ (++ funs)
+            tell funs
             return $ makeClosureTemplate resultName (getNodeId r) closureVars
             where
                 funs = lambdaTemplate (getExType r') (getNodeId r) params eval code
                 closureVars = toList $ mapWithKey (\name _ -> not $ member name $ getParamSet r) $ getClosure $ fieldVal r
 
         
--- cpuCodeGenAlg (r ::< Lambda params binds (r' :< _,code)) = do
---     CpuCodeT evals _ <- get
---     let funs = lambdaTemplate retT (getNodeId r) params binds' code bodyOwnsStorage
---         vars = toList $ mapWithKey (\name _ -> not $ member name $ getParamSet r) $ getClosure $ fieldVal r
---         retT = getExType r'
---         binds' = map (\(name, (r'' :< _,code)) -> letBindingTemplate (getExType r'') (pack name) code) binds ++ evals
---         bodyOwnsStorage = ownStorage $ fieldVal r'
---     modify $ (\(CpuCodeT _ fs) -> CpuCodeT [] (fs ++ funs))
---     return $ 
     
 -- cpuCodeGenAlg (r ::< RnZ (rR :< _,codeRed) (rZ :< _,codeZip) vecs) = do
 --     modify $ (<> CpuCodeT evals [])
@@ -114,7 +104,7 @@ cpuCodeGen :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields, Calle
 cpuCodeGen evalName expr hofSpec storage = filter (\c -> c /= '\r') genCode where
         genCode = cpuEvaluatorTemplate closures funs retT (pack evalName) eval code
         closures = map (fmap toList) $ getClosureList $ fieldVal $ extract expr
-        (CodeT code eval, funs) = runState (paraM cpuCodeGenAlg expr) mempty
+        (CodeT code eval, funs) = runWriter (paraM cpuCodeGenAlg expr)
         retT = getType $ extract expr
 
 -- indent :: String -> String -> String
