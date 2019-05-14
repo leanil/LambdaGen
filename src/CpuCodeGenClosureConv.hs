@@ -18,7 +18,7 @@ import Control.Comonad.Cofree (Cofree(..))
 import Control.Monad.Writer.Lazy (Writer, runWriter, tell)
 import Data.Foldable (fold)
 import Data.Functor.Foldable (para)
-import Data.Map.Strict (mapWithKey, toList, null)
+import Data.Map.Strict (assocs, mapWithKey, toList, null)
 import Data.Maybe (fromJust, catMaybes)
 import Data.Set (member)
 import Data.Text (Text, append, filter, pack, singleton, unpack)
@@ -34,7 +34,7 @@ cpuCodeGenAlg (r ::< node) =
     let eval = fold $ fmap (getEval . snd) node
         resultName = case (fieldVal r, fieldVal r, getType r) of
             (OwnStorage False, _, _)  -> OutParam
-            (_, _, FPower{})          -> Tensor $ pack $ getMemId r
+            (_, _, FPower{})          -> Tensor $ getMemId r
             (_, LetId (Just name), _) -> LetBound $ pack name 
             otherwise                 -> None
 
@@ -58,8 +58,10 @@ cpuCodeGenAlg (r ::< node) =
                 funs = lambdaTemplate (getExType r') (getNodeId r) params eval code
                 closureVars = toList $ mapWithKey (\name _ -> not $ member name $ getParamSet r) $ getClosure $ fieldVal r
 
-        
-    
+        RnZ (rR :< _,codeRed) (rZ :< _,codeZip) (map snd -> vecNames) -> do
+            return $ rnzAppTemplate eval resultName hofSpecId codeRed codeZip (getNodeId r) vecNames where
+                hofSpecId = fromJust $ getHofSpec $ fieldVal r
+
 -- cpuCodeGenAlg (r ::< RnZ (rR :< _,codeRed) (rZ :< _,codeZip) vecs) = do
 --     modify $ (<> CpuCodeT evals [])
 --     return $ rnzTemplate hofSpecId codeRed codeZip vecNames outParam where
@@ -101,10 +103,11 @@ textToMaybe t = Just t
 
 cpuCodeGen :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields, Callee ∈ fields, ClosureT ∈ fields, IsFreeVar ∈ fields, ParamSet ∈ fields, HofSpecId ∈ fields, OwnStorage ∈ fields) => 
     String -> Expr fields -> HofSpec -> [Storage] -> Text
-cpuCodeGen evalName expr hofSpec storage = filter (\c -> c /= '\r') genCode where
-        genCode = cpuEvaluatorTemplate closures funs retT (pack evalName) eval code
+cpuCodeGen evalName expr (HofSpec rnzSpec zipSpec) storage = filter (\c -> c /= '\r') genCode where
+        genCode = cpuEvaluatorTemplate closures storage (funs ++ hofs) retT (pack evalName) eval code
         closures = map (fmap toList) $ getClosureList $ fieldVal $ extract expr
         (CodeT code eval, funs) = runWriter (paraM cpuCodeGenAlg expr)
+        hofs = concatMap rnzTemplate (assocs rnzSpec) ++ concatMap zipTemplate (assocs zipSpec)
         retT = getType $ extract expr
 
 -- indent :: String -> String -> String

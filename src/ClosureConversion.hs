@@ -5,7 +5,7 @@ module ClosureConversion where
 import Expr
 import Metrics
 import Recursion
-import Type
+import Type hiding (size)
 import Typecheck
 import Control.Comonad.Cofree (Cofree(..))
 import Control.Monad.State (State, evalState, get, modify, runState)
@@ -85,25 +85,25 @@ getParamSet :: ParamSet ∈ fields => R fields -> Set String
 getParamSet (fieldVal -> ParamSet params) = params
 
 newtype HofSpecId = HofSpecId { getHofSpec :: Maybe Int }
-data HofSpec = HofSpec { rnzSpec :: Map (Int,Int) Int, zipSpec :: Map Int Int }
+data HofSpec = HofSpec { rnzSpec :: Map (Int,Int) (Type,Int), zipSpec :: Map Int (Type,Int) }
 instance Semigroup HofSpec where (<>) (HofSpec ra za) (HofSpec rb zb) = HofSpec (union ra rb) (union za zb)
 instance Monoid HofSpec where mempty = HofSpec empty empty
 
-hofSpecAlg :: Callee ∈ fields => MAlgebra (Expr fields) (State HofSpec) HofSpecId
-hofSpecAlg ((getCallee . fieldVal -> callee) ::< node) = do
+hofSpecAlg :: (TypecheckT ∈ fields, Callee ∈ fields) => MAlgebra (Expr fields) (State HofSpec) HofSpecId
+hofSpecAlg (r ::< node) = do
     (HofSpec rs zs) <- get
-    let (specId, update) = case (callee, node) of
+    let (specId, update) = case (getCallee $ fieldVal r, node) of
                            ([x,y], RnZ{}) -> helper rs (x,y) (flip HofSpec $ empty)
                            ([x], ZipWithN{}) -> helper zs x (HofSpec empty)
                            otherwise -> (Nothing, mempty)
                            where helper spec key embed = case spec !? key of
-                                    Just specId -> (Just specId, embed empty)
-                                    Nothing -> (Just specId, embed (singleton key specId)) where 
+                                    Just (_,specId) -> (Just specId, embed empty)
+                                    Nothing -> (Just specId, embed $ singleton key (getType r,specId)) where 
                                         specId = size spec
     modify $ mappend $ update
     return $ HofSpecId $ specId
 
-hofSpec :: Callee ∈ fields => Expr fields -> (Expr (HofSpecId ': fields), HofSpec)
+hofSpec :: (TypecheckT ∈ fields, Callee ∈ fields) => Expr fields -> (Expr (HofSpecId ': fields), HofSpec)
 hofSpec = (`runState` mempty) . cataM (annotateM hofSpecAlg)
 
 closureConversion :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields) => Expr fields -> (Expr (HofSpecId ': ParamSet ': IsFreeVar ': ClosureT ': Callee ': fields), HofSpec)

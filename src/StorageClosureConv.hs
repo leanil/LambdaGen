@@ -19,8 +19,9 @@ import Data.Vinyl (rput, type (∈))
 import Data.Vinyl.Functor (Identity(..))
 import Data.Foldable (fold)
 import Data.Functor.Foldable (ana, cata, project, unfix)
+import Data.Text (Text, append, pack)
 
-data Storage = Storage { memId :: String, shape :: Type } deriving Show
+data Storage = Storage { memId :: Text, shape :: Type } deriving Show
 newtype OwnStorage = OwnStorage { ownStorage :: Bool }
 
 storageAlg :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields) => MCoAlgebra (Cofree ExprF Bool) (Writer [Storage]) (Expr fields, Bool)
@@ -36,14 +37,15 @@ storageAlg (r :< node, tag) = do
         Lambda{} -> return $ True ::< zipExprF node (curried : repeat True) where
             curried = case getType r of FArrow _ FArrow{} -> True; _ -> False
         ZipWithN{} -> return $ tag ::< zipExprF node (False : repeat True)
-        RnZ _ zipper _ -> do
-            tell $ [Storage (getMemId r ++ "_tmp") (to $ unfix $ getType $ extract zipper)]
-            return $ tag ::< zipExprF node (False : False : repeat True)
+        RnZ _ _ vecs -> do
+            tell $ [Storage (getMemId r `append` tmpSuffix) (raiseToPower (getType r) tmpSize)] 
+            return $ tag ::< zipExprF node (False : False : repeat True) where
+                tmpSize = size $ getType $ extract $ head vecs
 
-getMemId :: (NodeId ∈ fields, LetId ∈ fields) => R fields -> String
+getMemId :: (NodeId ∈ fields, LetId ∈ fields) => R fields -> Text
 getMemId r = case fieldVal r of
-    LetId (Just name) -> name
-    LetId Nothing -> resultTensor $ getNodeId r
+    LetId (Just name) -> pack name
+    LetId Nothing -> tResultTensor $ getNodeId r
 
 assignStorage :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields) => Expr fields -> (Expr (OwnStorage ': fields), [Storage])
 assignStorage = runWriter . anaM (annotateAnaM2 OwnStorage storageAlg) . (,True)

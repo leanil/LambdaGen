@@ -33,4 +33,7 @@ zipIdToName :: Int -> Text
 zipIdToName = append "_zip" . tshow
 
 wrapperSuffix :: Text
-wrapperSuffix = ""
+wrapperSuffix = "w"
+
+tmpSuffix :: Text -- For the temporary storage of reduction
+tmpSuffix = "_tmp"
