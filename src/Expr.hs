@@ -7,6 +7,7 @@ import Control.Comonad.Cofree
 import Data.Eq.Deriving (deriveEq1)
 import Data.List
 import Data.Vinyl
+import Text.Show.Deriving (deriveShow1)
 
 data ExprF a
     = Scalar { getSclVal :: Double }
@@ -24,6 +25,7 @@ data ExprF a
     deriving (Functor, Foldable, Traversable, Show)
 
 deriveEq1 ''ExprF
+deriveShow1 ''ExprF
 
 castLeaf :: ExprF a -> ExprF b
 castLeaf = fmap undefined

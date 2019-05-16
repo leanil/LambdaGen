@@ -12,18 +12,18 @@ import Data.Map.Strict (Map, (!), empty, insert)
 import Data.Monoid (Sum(..), (<>))
 import Data.Vinyl (type (∈))
 
-newtype SubtreeSize = SubtreeSize (Sum Int) deriving (Show)
+-- newtype SubtreeSize = SubtreeSize (Sum Int) deriving (Show)
 
-instance Semigroup SubtreeSize where
-    (SubtreeSize a) <> (SubtreeSize b) = SubtreeSize (a <> b)
-instance Monoid SubtreeSize where
-    mempty = SubtreeSize (Sum 0)
+-- instance Semigroup SubtreeSize where
+--     (SubtreeSize a) <> (SubtreeSize b) = SubtreeSize (a <> b)
+-- instance Monoid SubtreeSize where
+--     mempty = SubtreeSize (Sum 0)
 
-subtreeSizeAlg :: Algebra (Expr fields) SubtreeSize
-subtreeSizeAlg (_ ::< node) = SubtreeSize (Sum 1) <> fold node
+-- subtreeSizeAlg :: Algebra (Expr fields) SubtreeSize
+-- subtreeSizeAlg (_ ::< node) = SubtreeSize (Sum 1) <> fold node
 
-getSubtreeSize :: SubtreeSize ∈ fields => R fields -> Int
-getSubtreeSize (fieldVal -> SubtreeSize (Sum x)) = x
+-- getSubtreeSize :: SubtreeSize ∈ fields => R fields -> Int
+-- getSubtreeSize (fieldVal -> SubtreeSize (Sum x)) = x
 
 newtype NodeId = NodeId Int deriving Show
 

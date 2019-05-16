@@ -1,21 +1,18 @@
-#include "evaluator1.hpp"
-#include "evaluator2.hpp"
-#include "evaluator3.hpp"
-#include "evaluator4.hpp"
-#include "evaluator5.hpp"
-#include "evaluator6.hpp"
-#include "evaluator7.hpp"
-#include "evaluator8.hpp"
-#include "evaluator9.hpp"
-#include "evaluator10.hpp"
-#include "evaluator11.hpp"
-#include "evaluator12.hpp"
-#include "evaluator13.hpp"
-#include "evaluator14.hpp"
-#include "evaluator15.hpp"
-#include "evaluator16.hpp"
-#include "evaluator17.hpp"
-#include "evaluator18.hpp"
+#include "evaluator1.h"
+#include "evaluator2.h"
+#include "evaluator3.h"
+#include "evaluator4.h"
+#include "evaluator5.h"
+#include "evaluator6.h"
+#include "evaluator7.h"
+#include "evaluator8.h"
+#include "evaluator9.h"
+#include "evaluator10.h"
+#include "evaluator11.h"
+#include "evaluator12.h"
+#include "evaluator13.h"
+#include "evaluator14.h"
+#include "evaluator15.h"
 #include "tester.hpp"
 #include <cstdlib>
 
@@ -42,13 +39,10 @@ int main(int argc, char** argv) {
     case 9: return check(evaluator9(bigVectors), "{4,8,12}");
     case 10: return check(evaluator10(bigVectors), "{3,3,3}");
     case 11: return check(evaluator11(bigVectors), "{4,6,8}");
-    case 12: return check(evaluator12(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
-    case 13: return check(evaluator13(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
-    case 14: return check(evaluator14(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
-    case 15: return check(evaluator15(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
-    case 16: return check(evaluator16(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
-    case 17: return check(evaluator17(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
-    case 18: return check(evaluator18(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
+    case 12: return check(evaluator12(bigVectors), "96");
+    case 13: return check(evaluator13(bigVectors), "3");
+    case 14: return check(evaluator14(bigVectors), "{{3,4,5},{4,5,6},{5,6,7}}");
+    case 15: return check(evaluator15(bigVectors), "14");
     default: return 1;
     }
 }

@@ -46,7 +46,7 @@ matAdd a b = let m1 = var "m1" (power double [a,b])
 matMul :: Int -> Int -> Int -> Expr0
 matMul a b c = let v  = var "v" (power double [b])
                    m1 = var "m1" (power double [a,b])
-                   m2 = var "m2" (power double [c,b])
+                   m2 = var "m2" (power' double [(c,1),(b,c)])
                in lam [m1,m2]
                       (mkMap
                           (lam [v] (mkMap

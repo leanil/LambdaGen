@@ -61,3 +61,4 @@ raiseToPower t a = power t [a]
 
 size :: Type -> Int
 size (FPower _ ((s,_):_)) = s
+size a = error $ "size on non-array type " ++ (showT a)

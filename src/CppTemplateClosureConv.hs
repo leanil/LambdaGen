@@ -9,10 +9,10 @@ import Type
 import Utility (mapFst, tshow)
 import Control.Arrow ((&&&))
 import Data.Maybe (isJust, maybeToList)
-import Data.Text (Text, append, concat, cons, intercalate, pack, snoc, strip, unlines, unpack)
+import Data.Text (Text, append, concat, cons, filter, intercalate, pack, snoc, strip, toUpper, unlines, unpack)
 import qualified Data.Text as T (null)
 import NeatInterpolation
-import Prelude hiding (concat, unlines)
+import Prelude hiding (concat, filter, unlines)
 
 data CodeT = CodeT { getValue :: Text, getEval :: Text } -- evaulator code may be empty
 data StoreResult = OutParam | Tensor Text | LetBound Text | None
@@ -35,11 +35,11 @@ scalarTemplate result (tshow -> x) = case result of
 viewTemplate :: StoreResult -> Text -> Text -> [Int] -> [Int] -> Text -> CodeT
 viewTemplate result pointerT dataT dims strides dataName = case result of
     OutParam -> CodeT outParamName (assignTemplate outParamName code)
-    Tensor name -> CodeT name [text|$viewT $name(userData["$dataName"]);|]
+    Tensor name -> CodeT name [text|$viewT $name(userData->at("$dataName"));|]
     None -> CodeT code ""
     where
         viewT = viewTypeTemplate pointerT dataT (dims,strides)
-        code = strip [text|$viewT(userData["$dataName"])|]
+        code = strip [text|$viewT(userData->at("$dataName"))|]
 
 varTemplate :: String -> Bool -> Text
 varTemplate (pack -> name) free = strip $ if free then [text|$closureParamName.$name|] else [text|$name|]
@@ -148,7 +148,7 @@ rnzAppTemplate eval result hofId reducer zipper nodeId vecNames = case result of
     LetBound name -> CodeT name (append eval $ initTemplate "double" name code)
     None -> CodeT code eval
     where
-        code = [text|$hofName($reducer, $zipper, $params)|] where
+        code = [text|$hofName($reducer, $zipper, $params)|]
         hofName = rnzIdToName hofId `append` if isJust outParam then "" else wrapperSuffix
         params = intercalate ", " $ maybeToList outParam ++ (tempStorage : vecNames) 
         outParam = case result of
@@ -187,18 +187,27 @@ rnzWrapperTemplate clRed clZip hofName =
     where
         wrapName = append hofName wrapperSuffix
 
-zipTemplate = undefined
+zipAppTemplate :: Text -> StoreResult -> Int -> Text -> [Text] -> CodeT
+zipAppTemplate eval result hofId zipper vecNames = 
+    CodeT outParam $ append eval [text|$code;|]
+    where
+        code = [text|$hofName($zipper, $params)|]
+        hofName = zipIdToName hofId
+        params = intercalate ", " $ outParam : vecNames 
+        outParam = case result of
+            OutParam -> outParamName
+            Tensor name -> name
 
--- zipWithNTemplate :: [Text] -> Text -> Text -> Text -> [Text] -> [Text] -> Text
--- zipWithNTemplate (concat -> evalVecs) idx size lambda params args =
---     let setParams =  makeAssignments params (indexedVecs args idx) in
---     [text|
---         $evalVecs
---         for (int $idx = 0; $idx < $size; ++$idx) {
---             $setParams
---             $lambda
---         }
---     |]
+zipTemplate :: (Int,(Type,Int)) -> (Text,Text)
+zipTemplate (zipId, (_, zipIdToName -> hofName)) =
+    ([text|
+        template<typename _T1, typename... _T>
+        void $hofName($clZip _clZip, _T1 _result, _T... vecs)|],
+    [text|
+        for (int i = 0; i < _result.size; ++i)
+            $lamZip(_clZip, vecs[i]..., _result[i]);|])
+    where
+        (clZip,lamZip) = lamIdToClosure &&& lamIdToName $ zipId
 
 -- flipTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text
 -- flipTemplate rhsCode auto result idx1 idx2 rhsResult =
@@ -253,32 +262,53 @@ funDefTemplate decl def =
         $def
     }|]
 
-cpuEvaluatorTemplate :: [(Int,[(String,ExType)])] -> [Storage] -> [(Text,Text)] -> Type -> Text -> Text -> Text -> Text
-cpuEvaluatorTemplate closures storage funs retT evaluatorName eval code =
-    [text|
-        #include "View.h"
-        #include <map>
-        #include <string>
-
-        $closures'
-
-        $allocs
-
-        $funDecls
-
-        $funDefs
-
-        $retT' $evaluatorName(std::map<std::string, double*> userData) {
-            $eval
-            $return
-        }
-    |]
+cpuEvaluatorTemplate :: [(Int,[(String,ExType)])] -> [Storage] -> [(Text,Text)] -> Type -> Text -> Text -> Text -> (Text,Text)
+cpuEvaluatorTemplate closures storage funs retT evalName eval code =
+    (purge $ cpuHeaderTemplate retT' evalName,
+    purge $ cpuCppTemplate closures' allocs funDecls funDefs retT' evalName eval code)
     where
+        purge = filter (\c -> c /= '\r')
         closures' = concat $ map (uncurry closureTemplate) closures
         allocs = concat $ map allocTemplate storage
         funDecls = concat $ map ((`append` ";\n") . strip . fst) funs
         funDefs = unlines $ map (strip . uncurry funDefTemplate) funs
         retT' = cppType retT
-        return = case retT of
-            FDouble -> [text|return $code;|]
-            _       -> ""
+
+cpuHeaderTemplate :: Text -> Text -> Text
+cpuHeaderTemplate retT evalName =
+    [text|
+        #ifndef $guard
+        #define $guard
+
+        #include "View.h"
+        #include <map>
+        #include <string>
+
+        $retT $evalName(std::map<std::string, double*> const& _userData);
+
+        #endif
+    |]
+    where guard = append (toUpper evalName) "_H"
+
+cpuCppTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text -> Text -> Text
+cpuCppTemplate closures allocs funDecls funDefs retT evalName eval code =
+    [text|
+        #include "$evalName.h"
+
+        namespace {
+        $closures
+
+        static const std::map<std::string, double*>* userData;
+        $allocs
+
+        $funDecls
+
+        $funDefs
+        }
+
+        $retT $evalName(std::map<std::string, double*> const& _userData) {
+            userData = &_userData;
+            $eval
+            return $code;
+        }
+    |]

@@ -154,12 +154,12 @@ calleeCheck = (
 
 storageAllocCheck :: Test
 storageAllocCheck = (
-    let f = var "f" (arrow [double] double) in
+    let f = var "f" (arrow [double] (power double [3])) in
     app
         (lamBind [y] [(f, lam [x] (mkMap (app sclAdd [x]) a))]
             (mkMap f (app f [y])))
         [scl 1],
-    "?")
+    "{{3,4,5},{4,5,6},{5,6,7}}")
 
 rnzCheck :: Test
 rnzCheck = (
@@ -167,4 +167,6 @@ rnzCheck = (
     "14")
 
 funcTests :: [Test]
-funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, matMatMul, zzSwap, zrSwap, rzSwap, rrSwap, rSubdiv, zSubdiv]
+funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11,
+            --matMatMul, zzSwap, zrSwap, rzSwap, rrSwap, rSubdiv, zSubdiv,
+            closureConvCheck, calleeCheck, storageAllocCheck, rnzCheck]

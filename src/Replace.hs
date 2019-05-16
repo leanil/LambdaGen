@@ -117,7 +117,7 @@ fillReplacement match = cata alg where
     alg (PSubdiv n a)       = RNil :< zipWithExprF (flip const) (mGetNode match n) [a]
     alg (PFlatten n a)      = RNil :< zipWithExprF (flip const) (mGetNode match n) [a]
     alg (PLambda n a)       = RNil :< zipWithExprF (flip const) (mGetNode match n) 
-                                      (map stripExpr (getArgList $ findWithDefault (Args []) (n ++ "__args") match) ++ [a])   
+                                      (a : map stripExpr (getArgList $ findWithDefault (Args []) (n ++ "__args") match))   
     alg (PStar n)           = stripExpr (mGetSubtree match n)
   
 type RepPattern = (PExpr,PExpr)

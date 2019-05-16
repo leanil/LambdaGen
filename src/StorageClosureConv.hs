@@ -36,10 +36,10 @@ storageAlg (r :< node, tag) = do
         Apply{} -> return $ tag ::< zipExprF node (True : repeat True)
         Lambda{} -> return $ True ::< zipExprF node (curried : repeat True) where
             curried = case getType r of FArrow _ FArrow{} -> True; _ -> False
-        ZipWithN{} -> return $ tag ::< zipExprF node (False : repeat True)
+        ZipWithN{} -> return $ tag ::< zipExprF node (repeat True)
         RnZ _ _ vecs -> do
             tell $ [Storage (getMemId r `append` tmpSuffix) (raiseToPower (getType r) tmpSize)] 
-            return $ tag ::< zipExprF node (False : False : repeat True) where
+            return $ tag ::< zipExprF node (repeat True) where
                 tmpSize = size $ getType $ extract $ head vecs
 
 getMemId :: (NodeId ∈ fields, LetId ∈ fields) => R fields -> Text
