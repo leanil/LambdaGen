@@ -58,7 +58,7 @@ closureConvAlg (_ ::< node) = fold node
 getExType :: (TypecheckT ∈ fields, Callee ∈ fields) => R fields -> ExType
 getExType r = case (getType r) of
     FArrow{}  -> Left $ head $ getFunStack $ fieldVal r
-    otherwise -> Right $ getType r
+    _         -> Right $ getType r
 
 newtype IsFreeVar = IsFreeVar { isFreeVar :: Bool } deriving Show
 
@@ -69,7 +69,7 @@ isFreeVarAlg (_ :< Variable name ty, closure) = IsFreeVar (member name closure) 
 isFreeVarAlg (r :< node, closure) = IsFreeVar False ::< fmap (,newClosure) node where 
     newClosure = case node of
         Lambda{} -> extractClosure r
-        otherwise -> closure
+        _        -> closure
     extractClosure (fieldVal -> ClosureT clMap _) = keysSet clMap
 
 -- | The set of names bound in the directly enclosing lambda.
@@ -79,7 +79,7 @@ paramSetAlg :: CoAlgebra (Cofree ExprF ParamSet) (Expr fields, ParamSet)
 paramSetAlg (_ :< node, paramSet) = paramSet ::< fmap (,paramSet') node where
     paramSet' = case node of
         Lambda params binds _ -> ParamSet (fromList $ map fst params ++ map fst binds)
-        otherwise             -> paramSet
+        _                     -> paramSet
 
 getParamSet :: ParamSet ∈ fields => R fields -> Set String
 getParamSet (fieldVal -> ParamSet params) = params
@@ -93,9 +93,9 @@ hofSpecAlg :: (TypecheckT ∈ fields, Callee ∈ fields) => MAlgebra (Expr field
 hofSpecAlg (r ::< node) = do
     (HofSpec rs zs) <- get
     let (specId, update) = case (getCallee $ fieldVal r, node) of
-                           ([x,y], RnZ{}) -> helper rs (x,y) (flip HofSpec $ empty)
+                           ([x,y], RnZ{})    -> helper rs (x,y) (flip HofSpec $ empty)
                            ([x], ZipWithN{}) -> helper zs x (HofSpec empty)
-                           otherwise -> (Nothing, mempty)
+                           _                 -> (Nothing, mempty)
                            where helper spec key embed = case spec !? key of
                                     Just (_,specId) -> (Just specId, embed empty)
                                     Nothing -> (Just specId, embed $ singleton key (getType r,specId)) where 
