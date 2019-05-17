@@ -95,7 +95,7 @@ test11 = (
 
 matMatMul, zzSwap, zrSwap, rzSwap, rSubdiv, rrSwap, zSubdiv :: Test
 matMatMul = (
-    let u = var "u" (power double [3])
+    let u = var "u" (power' double [(3,4)])
         v = var "v" (power double [3]) in
     mkMap
         (lam [u]
@@ -168,5 +168,5 @@ rnzCheck = (
 
 funcTests :: [Test]
 funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11,
-            --matMatMul, zzSwap, zrSwap, rzSwap, rrSwap, rSubdiv, zSubdiv,
+            matMatMul, zzSwap, zrSwap, rzSwap, rrSwap, rSubdiv, zSubdiv,
             closureConvCheck, calleeCheck, storageAllocCheck, rnzCheck]

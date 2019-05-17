@@ -66,26 +66,9 @@ cpuCodeGenAlg (r ::< node) =
             return $ zipAppTemplate eval resultName hofSpecId code vecNames where
                 hofSpecId = fromJust $ getHofSpec $ fieldVal r
 
--- cpuCodeGenAlg (r ::< ZipWithN (getParamNames -> pa,CpuCodeT a) vs@(unzipCodes -> (evals,names))) =
---     CpuCodeT $ zipWithNTemplate evals (pack $ makeHofIdx r) (pack $ show $ getVecSize vs) a pa names
-
--- cpuCodeGenAlg (r ::< Flip (i,j) (ra :< _,CpuCodeT a)) =
---     CpuCodeT $ flipTemplate a auto (getResultId r) (pack $ show i) (pack $ show j) (getResultId ra) where
---         auto = case fieldVal r of
---             Std _ True _ -> ""
---             Std _ False _ -> "auto "
-
--- cpuCodeGenAlg (r ::< Subdiv i b (ra :< _,CpuCodeT a)) =
---     CpuCodeT $ subdivTemplate a auto (getResultId r) (pack $ show i) (pack $ show b) (getResultId ra) where
---         auto = case fieldVal r of
---             Std _ True _ -> ""
---             Std _ False _ -> "auto "
-
--- cpuCodeGenAlg (r ::< Flatten i (ra :< _,CpuCodeT a)) =
---     CpuCodeT $ flattenTemplate a auto (getResultId r) (pack $ show i) (getResultId ra) where
---         auto = case fieldVal r of
---             Std _ True _ -> ""
---             Std _ False _ -> "auto "            
+        LayoutOp op (_,code) ->
+            return $ layoutOpTemplate eval resultName op shape code where
+                shape = case getType r of FPower _ s -> unzip s          
 
 textToMaybe :: Text -> Maybe Text
 textToMaybe "" = Nothing
@@ -99,13 +82,3 @@ cpuCodeGen evalName expr (HofSpec rnzSpec zipSpec) storage =
         (CodeT code eval, funs) = runWriter (paraM cpuCodeGenAlg expr)
         hofs = concatMap rnzTemplate (assocs rnzSpec) ++ map zipTemplate (assocs zipSpec)
         retT = getType $ extract expr
-
--- indent :: String -> String -> String
--- indent tabs code = unlines (map (tabs++) (lines code))
-
--- withNL :: String -> String
--- withNL [] = []
--- withNL s  = s ++ ",\n"
-
--- getResultId :: Result ∈ fields => R fields -> Text
--- getResultId (fieldVal -> Std resultId _ _) = pack resultId

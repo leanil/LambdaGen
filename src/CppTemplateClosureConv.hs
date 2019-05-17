@@ -3,6 +3,7 @@
 module CppTemplateClosureConv where
 
 import ClosureConversion
+import Expr
 import Naming
 import StorageClosureConv
 import Type
@@ -36,7 +37,7 @@ viewTemplate :: StoreResult -> Text -> Text -> [Int] -> [Int] -> Text -> CodeT
 viewTemplate result pointerT dataT dims strides dataName = case result of
     OutParam -> CodeT outParamName (assignTemplate outParamName code)
     Tensor name -> CodeT name [text|$viewT $name(userData->at("$dataName"));|]
-    None -> CodeT code ""
+    None -> CodeT code "" -- never fires, even though it could in function arguments and final return value
     where
         viewT = viewTypeTemplate pointerT dataT (dims,strides)
         code = strip [text|$viewT(userData->at("$dataName"))|]
@@ -209,29 +210,18 @@ zipTemplate (zipId, (_, zipIdToName -> hofName)) =
     where
         (clZip,lamZip) = lamIdToClosure &&& lamIdToName $ zipId
 
--- flipTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text
--- flipTemplate rhsCode auto result idx1 idx2 rhsResult =
---     [text|
---         $rhsCode
---         $auto$result = flip<$idx1>($rhsResult);
---     |]
-
--- subdivTemplate :: Text -> Text -> Text -> Text -> Text -> Text -> Text
--- subdivTemplate rhsCode auto result idx block rhsResult =
---     [text|
---         $rhsCode
---         $auto$result = subdiv<$idx,$block>($rhsResult);
---     |]
-
--- flattenTemplate :: Text -> Text -> Text -> Text -> Text -> Text
--- flattenTemplate rhsCode auto result idx rhsResult =
---     [text|
---         $rhsCode
---         $auto$result = flatten<$idx>($rhsResult);
---     |]
+layoutOpTemplate :: Text -> StoreResult -> LayoutOp -> ([Int],[Int]) -> Text -> CodeT
+layoutOpTemplate eval result layout shape code = case result of
+    OutParam -> CodeT outParamName (append eval $ assignTemplate outParamName code')
+    Tensor name -> CodeT name (append eval $ initTemplate viewT name code')
+    where
+        viewT = viewTypeTemplate "double*" "double" shape
+        code' = case layout of
+            FlipOp (tshow -> idx,_)                  -> [text|flip<$idx>($code)|]
+            SubdivOp (tshow -> idx) (tshow -> block) -> [text|subdiv<$idx,$block>($code)|]
+            FlattenOp (tshow -> idx)                 -> [text|flatten<$idx>($code)|]
 
 viewDimElemTemplate :: (Int, Int) -> Text
-viewDimElemTemplate (1,1) = ""
 viewDimElemTemplate (tshow -> size, tshow -> stride) =
     strip [text|P<$size,$stride>|]
 

@@ -13,6 +13,13 @@
 #include "evaluator13.h"
 #include "evaluator14.h"
 #include "evaluator15.h"
+#include "evaluator16.h"
+#include "evaluator17.h"
+#include "evaluator18.h"
+#include "evaluator19.h"
+#include "evaluator20.h"
+#include "evaluator21.h"
+#include "evaluator22.h"
 #include "tester.hpp"
 #include <cstdlib>
 
@@ -39,10 +46,17 @@ int main(int argc, char** argv) {
     case 9: return check(evaluator9(bigVectors), "{4,8,12}");
     case 10: return check(evaluator10(bigVectors), "{3,3,3}");
     case 11: return check(evaluator11(bigVectors), "{4,6,8}");
-    case 12: return check(evaluator12(bigVectors), "96");
-    case 13: return check(evaluator13(bigVectors), "3");
-    case 14: return check(evaluator14(bigVectors), "{{3,4,5},{4,5,6},{5,6,7}}");
-    case 15: return check(evaluator15(bigVectors), "14");
+    case 12: return check(evaluator12(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
+    case 13: return check(evaluator13(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
+    case 14: return check(evaluator14(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
+    case 15: return check(evaluator15(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
+    case 16: return check(evaluator16(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
+    case 17: return check(evaluator17(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
+    case 18: return check(evaluator18(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
+    case 19: return check(evaluator19(bigVectors), "96");
+    case 20: return check(evaluator20(bigVectors), "3");
+    case 21: return check(evaluator21(bigVectors), "{{3,4,5},{4,5,6},{5,6,7}}");
+    case 22: return check(evaluator22(bigVectors), "14");
     default: return 1;
     }
 }
