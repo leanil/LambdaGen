@@ -19,22 +19,22 @@
 #include "evaluator19.h"
 #include "evaluator20.h"
 #include "evaluator21.h"
-#include "evaluator22.h"
-#include "tester.hpp"
-#include <cstdlib>
+#include "evaluator22.h"
+#include "tester.hpp"
+#include <cstdlib>
 
-int main(int argc, char** argv) {
-    std::map<std::string, double*> bigVectors{
-        { "vec", gen_seq(7,3) },
-        { "mat", gen_seq(1,6) },
-        { "a", gen_seq(1,3) },
-        { "b", gen_seq(1,3) },
-        { "mat8", gen_seq(1,8) },
-        { "tens", gen_seq(1,24) },
-        { "M1", gen_seq(1,6) },
-        { "M2", gen_seq(7,12) }
-    };
-    switch (atoi(argv[1])) {
+int main(int argc, char** argv) {
+    std::map<std::string, double*> bigVectors{
+        { "vec", gen_seq(7,3) },
+        { "mat", gen_seq(1,6) },
+        { "a", gen_seq(1,3) },
+        { "b", gen_seq(1,3) },
+        { "mat8", gen_seq(1,8) },
+        { "tens", gen_seq(1,24) },
+        { "M1", gen_seq(1,6) },
+        { "M2", gen_seq(7,12) }
+    };
+    switch (atoi(argv[1])) {
     case 1: return check(evaluator1(bigVectors), "20");
     case 2: return check(evaluator2(bigVectors), "17");
     case 3: return check(evaluator3(bigVectors), "16");
@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     case 19: return check(evaluator19(bigVectors), "96");
     case 20: return check(evaluator20(bigVectors), "3");
     case 21: return check(evaluator21(bigVectors), "{{3,4,5},{4,5,6},{5,6,7}}");
-    case 22: return check(evaluator22(bigVectors), "14");
-    default: return 1;
-    }
+    case 22: return check(evaluator22(bigVectors), "14");
+    default: return 1;
+    }
 }

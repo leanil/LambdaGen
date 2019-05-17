@@ -128,11 +128,7 @@ closureConvCheck = (
         (app
             (lamBind [x] [(q, scl 8)]
                 (lamBind [y] [(p, scl 8), (h,
-<<<<<<< HEAD
                     lam [z] (add (add x y) z))]
-=======
-                    lam [z] (add (add x z) y))]
->>>>>>> master
                     (add (mul (app h [scl 6]) p) q)))
             [scl 2])
         [scl 3],
@@ -154,7 +150,6 @@ calleeCheck = (
                             [scl 1]])))
             [scl 1])
         [scl 1],
-<<<<<<< HEAD
     "3")
 
 storageAllocCheck :: Test
@@ -170,9 +165,6 @@ rnzCheck :: Test
 rnzCheck = (
     mkRnZ sclAdd sclMul [a,b],
     "14")
-=======
-    "2")
->>>>>>> master
 
 funcTests :: [Test]
 funcTests = [test1, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11,

@@ -6,11 +6,7 @@ import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree ((:<)))
 import qualified Control.Comonad.Trans.Cofree as CofreeT (CofreeF ((:<)))
 import Control.Comonad.Trans.Cofree (headF, tailF)
-<<<<<<< HEAD
 import Control.Monad (Monad, (<=<), liftM2)
-=======
-import Control.Monad (Monad, (<=<))
->>>>>>> master
 import Data.Functor.Foldable
 import Data.Proxy (Proxy(Proxy))
 import Data.Vinyl
@@ -25,11 +21,8 @@ type Algebra t a = Base t a -> a
 type RAlgebra t a = Base t (t, a) -> a
 type CoAlgebra t a = a -> Base t a
 type MAlgebra t m a = Base t a -> m a
-<<<<<<< HEAD
 type MRAlgebra t m a = Base t (t, a) -> m a
 type MCoAlgebra t m a = a -> m (Base t a)
-=======
->>>>>>> master
 
 annotateCata :: Functor f => ((t, f new) -> new) -> ((t, f (Cofree f (t, new))) -> Cofree f (t, new))
 annotateCata alg (old, f) = (old,new) :< f where
@@ -87,13 +80,9 @@ cataM :: (Monad m, Traversable (Base t), Recursive t) => (Base t a -> m a) -> t 
 cataM alg = c where c = alg <=< traverse c . project
 
 anaM :: (Monad m, Traversable (Base t), Corecursive t) => (a -> m (Base t a)) -> a -> m t
-<<<<<<< HEAD
 anaM coalg = a where a = (return . embed) <=< traverse a <=< coalg
 
 paraM:: (Monad m, Traversable (Base t), Recursive t) => (Base t (t, a) -> m a) -> t -> m a
 paraM alg = p where
     p   = alg <=< traverse f . project
     f t = liftM2 (,) (return t) (p t)
-=======
-anaM coalg = a where a = (return . embed) <=< traverse a <=< coalg
->>>>>>> master
