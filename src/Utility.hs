@@ -1,6 +1,10 @@
 module Utility where
 
 import Data.List (sort, sortBy)
+import Data.Text (Text, pack)
+
+tshow :: Show a => a -> Text
+tshow = pack . show
 
 mapFst :: (a -> b) -> (a,c) -> (b,c)
 mapFst f (p,q) = (f p, q)

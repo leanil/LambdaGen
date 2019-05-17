@@ -26,7 +26,7 @@ typecheckAlg (_ ::< Scalar _) = Left double
 
 typecheckAlg (_ ::< Variable _ t) = Left t
 
-typecheckAlg (_ ::< View _ d _) = Left $ power double d
+typecheckAlg (_ ::< View _ d s) = Left $ power' double (zip d s)
 
 typecheckAlg (_ ::< ScalarOp _ (Left FDouble) (Left FDouble)) = Left double
 typecheckAlg (_ ::< ScalarOp _ (Left a) (Left b)) = Right $ mapMaybe scalarCheck [a,b]
@@ -44,7 +44,7 @@ typecheckAlg (_ ::< RnZ (Left (FArrow [a,b] c)) (Left (FArrow d e)) (allLeft -> 
 typecheckAlg (_ ::< RnZ (Left a) (Left b) (allLeft -> Just c)) = Right $ catMaybes [biLambdaCheck a, biLambdaCheck b, eqVectorCheck c]            
 
 typecheckAlg (_ ::< ZipWithN (Left (FArrow a b)) (allLeft -> Just c)) =
-    typeOrErrors (raiseToPower b $ fstDim $ head c) [eqVectorCheck c, varMatchCheck a c]
+    typeOrErrors (raiseToPower b $ size $ head c) [eqVectorCheck c, varMatchCheck a c]
 typecheckAlg (_ ::< ZipWithN (Left a) (allLeft -> Just b)) = Right $ catMaybes [biLambdaCheck a, eqVectorCheck b]   
 
 typecheckAlg (_ ::< Flip (i,j) (Left (FPower a b)))
@@ -105,12 +105,8 @@ biLambdaCheck (FArrow [_,_] _) = Nothing
 biLambdaCheck a = Just $ showT a ++ " not a binary lambda"
 
 eqVectorCheck :: [Type] -> Maybe Error
-eqVectorCheck (nub . map fstDim -> [s]) | s > 0 = Nothing
+eqVectorCheck (nub . map size -> [s]) | s > 0 = Nothing
 eqVectorCheck a = Just $ show a ++ " sould be a non-empty list of equal sized (non-empy) vectors"
-
-fstDim :: Type -> Int
-fstDim (FPower _ ((x,_):_)) = x
-fstDim _ = -1
 
 elemType :: Type -> Type
 elemType (FPower a b@(_:_:_)) = power' a (tail b)

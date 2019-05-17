@@ -52,7 +52,7 @@ buildExpr (Diagram links nodes) = ana helper root where
         let i = links ! (ports (nodes ! node) ! child) in (getExpr $ nodes ! i, i)
 
 process :: TypecheckT ∈ fields => Expr fields -> 
-    Expr (ResultPack ': Result ': ParData ': NodeId ': SubtreeSize ': fields)
+    Expr (ResultPack ': Result ': ParData ': NodeId ': fields)
 process expr =
     collectStorage $
     assignStorage $

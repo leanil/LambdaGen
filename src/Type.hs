@@ -55,5 +55,10 @@ showT :: Type -> String
 showT = cata typePrinterAlg
 
 raiseToPower :: Type -> Int -> Type
-raiseToPower (FPower t b@((d,s):_)) a = power' t ((a,d*s):b)
+raiseToPower (FPower t shape) a = power' t ((a,stride):shape) where
+    stride = product $ map fst shape
 raiseToPower t a = power t [a]
+
+size :: Type -> Int
+size (FPower _ ((s,_):_)) = s
+size a = error $ "size on non-array type " ++ (showT a)

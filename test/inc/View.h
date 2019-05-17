@@ -58,7 +58,7 @@ struct Flip<0, List<A, List<B, T>>> {
 template<int D, typename S>
 using flip_t = typename Flip<D, S>::type;
 
-template<typename Ptr, typename T, typename Ds, bool IsRef = false> class View;
+template<typename Ptr, typename T, typename Ds, bool IsRef = true> class View;
 
 template<int d, typename Ptr, typename T, typename Ds, bool IsRef>
 auto flip(View<Ptr, T, Ds, IsRef> v) {
@@ -89,6 +89,7 @@ class View<Ptr, T, List<D, Ds>, IsRef> {
 public:
     View(Ptr data) : data(data) {}
     View() : data(new T[typename ViewSize<List<D, Ds>>::type()]), share(data) {}
+    View (const View&) = default;
 
     static constexpr int size = D::dim;
 
@@ -170,26 +171,26 @@ public:
 };
 
 // Specialization for holding single scalar partial results / temporaries.
-template<typename Ptr, typename T>
-class View<Ptr, T, EmptyList, false> {
-public:
-
-    template<bool OtherRef>
-    View<Ptr, T, EmptyList, true>& operator=(const View<Ptr, T, EmptyList, OtherRef>& other) {
-        data = (T)other;
-        return *this;
-    }
-
-    void operator=(T x) {
-        data = x;
-    }
-
-    operator T() const {
-        return data;
-    }
-
-    T data;
-};
+//template<typename Ptr, typename T>
+//class View<Ptr, T, EmptyList, false> {
+//public:
+//
+//    template<bool OtherRef>
+//    View<Ptr, T, EmptyList, true>& operator=(const View<Ptr, T, EmptyList, OtherRef>& other) {
+//        data = (T)other;
+//        return *this;
+//    }
+//
+//    void operator=(T x) {
+//        data = x;
+//    }
+//
+//    operator T() const {
+//        return data;
+//    }
+//
+//    typename T::asd data;
+//};
 
 template<typename Ptr, typename T, bool IsRef>
 std::ostream& operator<<(std::ostream& out, const View<Ptr, T, EmptyList, IsRef>& v) {

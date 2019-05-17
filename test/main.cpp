@@ -1,36 +1,40 @@
-#include "evaluator1.hpp"
-#include "evaluator2.hpp"
-#include "evaluator3.hpp"
-#include "evaluator4.hpp"
-#include "evaluator5.hpp"
-#include "evaluator6.hpp"
-#include "evaluator7.hpp"
-#include "evaluator8.hpp"
-#include "evaluator9.hpp"
-#include "evaluator10.hpp"
-#include "evaluator11.hpp"
-#include "evaluator12.hpp"
-#include "evaluator13.hpp"
-#include "evaluator14.hpp"
-#include "evaluator15.hpp"
-#include "evaluator16.hpp"
-#include "evaluator17.hpp"
-#include "evaluator18.hpp"
-#include "tester.hpp"
-#include <cstdlib>
+#include "evaluator1.h"
+#include "evaluator2.h"
+#include "evaluator3.h"
+#include "evaluator4.h"
+#include "evaluator5.h"
+#include "evaluator6.h"
+#include "evaluator7.h"
+#include "evaluator8.h"
+#include "evaluator9.h"
+#include "evaluator10.h"
+#include "evaluator11.h"
+#include "evaluator12.h"
+#include "evaluator13.h"
+#include "evaluator14.h"
+#include "evaluator15.h"
+#include "evaluator16.h"
+#include "evaluator17.h"
+#include "evaluator18.h"
+#include "evaluator19.h"
+#include "evaluator20.h"
+#include "evaluator21.h"
+#include "evaluator22.h"
+#include "tester.hpp"
+#include <cstdlib>
 
-int main(int argc, char** argv) {
-    std::map<std::string, double*> bigVectors{
-        { "vec", gen_seq(7,3) },
-        { "mat", gen_seq(1,6) },
-        { "a", gen_seq(1,3) },
-        { "b", gen_seq(1,3) },
-        { "mat8", gen_seq(1,8) },
-        { "tens", gen_seq(1,24) },
-        { "M1", gen_seq(1,6) },
-        { "M2", gen_seq(7,12) }
-    };
-    switch (atoi(argv[1])) {
+int main(int argc, char** argv) {
+    std::map<std::string, double*> bigVectors{
+        { "vec", gen_seq(7,3) },
+        { "mat", gen_seq(1,6) },
+        { "a", gen_seq(1,3) },
+        { "b", gen_seq(1,3) },
+        { "mat8", gen_seq(1,8) },
+        { "tens", gen_seq(1,24) },
+        { "M1", gen_seq(1,6) },
+        { "M2", gen_seq(7,12) }
+    };
+    switch (atoi(argv[1])) {
     case 1: return check(evaluator1(bigVectors), "20");
     case 2: return check(evaluator2(bigVectors), "17");
     case 3: return check(evaluator3(bigVectors), "16");
@@ -49,6 +53,10 @@ int main(int argc, char** argv) {
     case 16: return check(evaluator16(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
     case 17: return check(evaluator17(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
     case 18: return check(evaluator18(bigVectors), "{{74,173},{80,188},{86,203},{92,218}}");
-    default: return 1;
-    }
+    case 19: return check(evaluator19(bigVectors), "96");
+    case 20: return check(evaluator20(bigVectors), "3");
+    case 21: return check(evaluator21(bigVectors), "{{3,4,5},{4,5,6},{5,6,7}}");
+    case 22: return check(evaluator22(bigVectors), "14");
+    default: return 1;
+    }
 }

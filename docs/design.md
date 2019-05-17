@@ -1,6 +1,12 @@
 # Design considerations and decisions
+
 ## Internal mechanics
-### Code generation for Scalar, VectorView and Variable
+
+### Storage
+
+We avoid asd  
+### Code generation
+
 When the above nodes would allocate memory, we can omit generating any evaluation code for them. The "result"
 can be accessed directly through their names. For example `add (scl 5) (var "x" double)` should generate
 ```cpp
@@ -20,6 +26,5 @@ value at evaluation, so we need to generate code for an assignment. For example 
     m1 = x;
 }
 ```
-## Lambda representation (Currying)
+# Lambda representation (Currying)
 The uncurried form is more compact, which helps pattern-based transformations. Partial application can be supported either by still generating curried lambdas, or by replacing incomplete applications with reduced lambdas and let bindings, e.g. `app (lam [x,y] (add x y)) [scl 1]` --> `lam [y] (let x (scl 1) (add x y))`. The latter was chosen, because uncurried lambdas are more natural in C++, and probably more efficient as well.
-## Expression tree annotation

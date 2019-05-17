@@ -1,62 +1,28 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE DataKinds #-}
 
-import ClosureConversion
-import ConstFold
-import CpuCodeGenInliner
+import Compile
 import Expr
 import FunctionalTest
 import Metrics
-import Parallel
-import qualified PerformanceTest
 import Print
 import Recursion
-import Replace
-import StorageClosureConv
-import Transformation
 import Typecheck
 import Control.Comonad (extract)
 import Data.Functor.Foldable (cata)
 import Data.List (intercalate)
 import Data.Proxy (Proxy(Proxy))
-import Data.Vinyl
+import Data.Text.IO as T (writeFile)
+import System.FilePath ((</>))
 
 import Data.Map.Strict
 import Control.Monad.State
 
 test :: Expr0
-test = fst calleeCheck -- closureConvCheck
-
-process :: TypecheckT ∈ fields => Expr fields -> 
-    Expr (ResultPack ': Result ': ParData ': IsFreeVar ': Callee ': ClosureT ': NodeId ': SubtreeSize ': fields)
-process expr =
-    collectStorage $
-    assignStorage $
-    parallelize 4 $
-    closureConversion $
-    assignNodeId $
-    cata constFoldAlg expr
-
-compile :: String -> String -> Expr0 -> IO ()
-compile fileName kernelName expr = do
-    let tcd = cata (annotate typecheckAlg) $ makeSymbolsUnique expr
-    case fieldVal @TypecheckT $ extract tcd of
-        (Left _) -> do
-            let rep = replaceAll partialApp partialAppTrans tcd
-            print $ runState (cataM calleeAlg $ assignNodeId rep) empty 
-            let prd = process $ typecheck' rep
-            --writeFile fileName $ cpuCodeGen kernelName prd
-            putStr $ printExpr (Proxy :: Proxy (R '[Callee, NodeId])) prd
-        (Right errors) ->
-            putStr $ intercalate "\n" errors ++ "\n\n" ++
-            printExpr (Proxy :: Proxy (R '[TypecheckT])) tcd
+test = fst rSubdiv
 
 main :: IO ()
 main = do
-    compile "../test/result.hpp" "eval" test
-    -- compile "../test/result1.hpp" "matMatMul" PerformanceTest.matMatMul
-    -- putStrLn ""
-    -- compile "../test/result2.hpp" "matMatMulTrans" PerformanceTest.matMatMulTrans
-    
-
-getLeft :: Either a b -> a
-getLeft (Left l) = l
+    result <- compile (".." </> "test") "eval" test
+    case result of
+        Just expr -> putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) expr
+        Nothing -> return ()

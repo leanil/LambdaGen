@@ -27,6 +27,7 @@ dependencies:
 - deriving-compat
 - directory
 - either
+- filepath
 - free
 - mtl
 - neat-interpolation

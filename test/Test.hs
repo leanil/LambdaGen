@@ -1,16 +1,7 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, QuasiQuotes, TypeApplications, TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
 
-import ConstFold
-import CpuCodeGenInliner
-import Expr
+import Compile
 import FunctionalTest
-import Metrics
-import Parallel
-import Recursion
-import Replace
-import StorageInliner
-import Transformation
-import Typecheck
 import Control.Comonad (extract)
 import Control.Monad (foldM)
 import Data.Functor.Foldable (cata)
@@ -19,24 +10,9 @@ import NeatInterpolation
 import Prelude hiding (concat)
 import System.Directory (createDirectoryIfMissing)
 import System.Exit (ExitCode(..), exitFailure)
+import System.FilePath ((</>),(<.>))
 import System.IO (print)
 import System.Process (cwd, createProcess, proc, waitForProcess)
-
-process :: Expr0 -> String -> IO ()
-process test evalId =
-    let tc = cata (annotate typecheckAlg) $ makeSymbolsUnique test in
-    case fieldVal @TypecheckT $ extract tc of
-    (Left _) -> writeFile ("test/kernel/" ++ evalId ++ ".hpp") $
-                cpuCodeGen evalId $
-                collectStorage $
-                assignStorage $
-                parallelize 4 $
-                assignNodeId $
-                cata constFoldAlg $
-                cata (annotate typecheckAlg) $
-                replaceAll partialApp partialAppTrans tc
-
-    (Right errors) -> print errors
 
 evalIds :: [String]
 evalIds = (map (("evaluator"++) . show) [1..(length funcTests)])
@@ -51,11 +27,11 @@ createProcessAndExitOnFailure processName args = do
 
 main :: IO ()
 main = do
-    foldM (\_ ((test,_),i) -> (process test i)) () (zip funcTests evalIds)
-    writeFile "test/main.cpp" $ unpack $
+    foldM (\_ (evalId,(test,_)) -> (compile ("test"</>"kernel") evalId test)) Nothing (zip evalIds funcTests) -- TODO: can we fold these whithout a seed?
+    writeFile ("test"</>"main"<.>"cpp") $ unpack $
         testCode (concat $ map (include . pack) evalIds)
                  (concat $ zipWith3 switch (map (pack . show) [1..]) (map pack evalIds) (map snd funcTests))
-    createDirectoryIfMissing True "test/build"
+    createDirectoryIfMissing True $ "test"</>"build"
     createProcessAndExitOnFailure "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
     createProcessAndExitOnFailure "cmake" ["--build", "."]
     createProcessAndExitOnFailure "ctest" []
@@ -86,7 +62,7 @@ testCode includeText switchText =
     |]
 
 include :: Text -> Text
-include evalId = [text|#include "$evalId.hpp"|]
+include evalId = [text|#include "$evalId.h"|]
 
 switch :: Text -> Text -> Text -> Text
 switch caseNum evalId expect = [text|case $caseNum: return check($evalId(bigVectors), "$expect");|]

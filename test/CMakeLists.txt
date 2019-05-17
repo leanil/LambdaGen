@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 
 project(LambdaGen LANGUAGES CXX)
 
-FILE(GLOB KERNELS kernel/evaluator*.hpp)
+FILE(GLOB KERNELS kernel/evaluator*.cpp)
             
 add_executable(LambdaGen main.cpp
                          inc/helper.h

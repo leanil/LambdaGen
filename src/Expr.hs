@@ -7,6 +7,7 @@ import Control.Comonad.Cofree
 import Data.Eq.Deriving (deriveEq1)
 import Data.List
 import Data.Vinyl
+import Text.Show.Deriving (deriveShow1)
 
 data ExprF a
     = Scalar { getSclVal :: Double }
@@ -17,26 +18,32 @@ data ExprF a
     | Variable { getName :: String, getVarType :: Type }
     | RnZ { getReducer :: a, getZipper :: a, getVecs :: [a] }
     | ZipWithN { getLambda :: a, getVecs :: [a] }
-    -- TODO: support non-adjacent flips on C++ side
-    | Flip { getDims :: (Int,Int), getBaseExpr :: a }
-    | Subdiv { getDim :: Int, getBlockSize :: Int, getBaseExpr :: a }
-    | Flatten { getDim :: Int, getBaseExpr :: a }
+    | LayoutOp { getLayoutOp :: LayoutOp, getBaseExpr :: a}
     deriving (Functor, Foldable, Traversable, Show)
 
+data LayoutOp
+    = FlipOp { getDims :: (Int,Int) } -- TODO: support non-adjacent flips on C++ side
+    | SubdivOp { getDim :: Int, getBlockSize :: Int }
+    | FlattenOp { getDim :: Int }
+    deriving (Eq, Show)
+
+pattern Flip a b     = LayoutOp (FlipOp a) b
+pattern Subdiv a b c = LayoutOp (SubdivOp a b) c
+pattern Flatten a b = LayoutOp (FlattenOp a) b
+
 deriveEq1 ''ExprF
+deriveShow1 ''ExprF
 
 castLeaf :: ExprF a -> ExprF b
-castLeaf = fmap (const undefined)
+castLeaf = fmap undefined
 
 zipWithExprF :: (a -> b -> c) -> ExprF a -> [b] -> ExprF c
 zipWithExprF f (ScalarOp op a b) (x:y:_) = ScalarOp op (f a x) (f b y)
 zipWithExprF f (Apply a b) (x:xs) = Apply (f a x) $ zipWith f b xs
-zipWithExprF f (Lambda a b c) (splitAt (length b) -> (xs,x:_)) = Lambda a (zipWith (\(s,p) q -> (s,f p q)) b xs) (f c x)
+zipWithExprF f (Lambda a b c) (x:xs) = Lambda a (zipWith (\(s,p) q -> (s,f p q)) b xs) (f c x)
 zipWithExprF f (RnZ a b c) (x:y:xs) = RnZ (f a x) (f b y) (zipWith f c xs)
 zipWithExprF f (ZipWithN a b) (x:xs) = ZipWithN (f a x) (zipWith f b xs)
-zipWithExprF f (Flip a b) (x:_) = Flip a (f b x)
-zipWithExprF f (Subdiv a b c) (x:_) = Subdiv a b (f c x)
-zipWithExprF f (Flatten a b) (x:_) = Flatten a (f b x)
+zipWithExprF f (LayoutOp op a) (x:_) = LayoutOp op (f a x)
 zipWithExprF _ a _ = castLeaf a
 
 zipExprF :: ExprF a -> [b] -> ExprF (a,b)

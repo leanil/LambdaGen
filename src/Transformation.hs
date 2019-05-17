@@ -29,7 +29,7 @@ partialAppTrans match = if x >= length (getParams l) then Nothing else Just $ fo
                 insert "lam" (Node Nothing (Lambda par bind ())),
                 insert "lam__args" (Args $ mGetArgList match "lam" ++ args) ]
     (par',par) = splitAt x (getParams l)
-    bind = getBindings l ++ map (fmap $ const ()) (take x par')
+    bind = getBindings l ++ map (fmap $ const ()) par'
 
 zipZipSwap :: RepPattern
 zipZipSwap = (MZipWithN "z1" (MLam "l1" (MZipWithN "z2" (MLam "l2" (MStar "f")))),
