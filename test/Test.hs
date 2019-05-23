@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
 
 import Compile
-import FunctionalTest
+import Test.FunctionalTest
 import Control.Comonad (extract)
 import Control.Monad (foldM)
 import Data.Functor.Foldable (cata)

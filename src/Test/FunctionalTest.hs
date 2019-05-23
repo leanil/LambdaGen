@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module FunctionalTest where
+module Test.FunctionalTest where
 
 import Expr
 import LinAlg

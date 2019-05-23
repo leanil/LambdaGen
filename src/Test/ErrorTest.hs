@@ -1,4 +1,4 @@
-module ErrorTest where 
+module Test.ErrorTest where 
 
 import Expr
 import Type

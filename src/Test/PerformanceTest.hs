@@ -1,4 +1,4 @@
-module PerformanceTest where
+module Test.PerformanceTest where
 
 import Expr
 import LinAlg
