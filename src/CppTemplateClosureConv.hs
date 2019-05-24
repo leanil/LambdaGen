@@ -9,6 +9,7 @@ import StorageClosureConv
 import Type
 import Utility (mapFst, tshow)
 import Control.Arrow ((&&&))
+import Data.List (foldl')
 import Data.Maybe (isJust, maybeToList)
 import Data.Text (Text, append, concat, cons, filter, intercalate, pack, snoc, strip, toUpper, unlines, unpack)
 import qualified Data.Text as T (null)
@@ -111,7 +112,7 @@ lambdaTemplate retT lamId (map (mapFst pack) -> params) eval body =
         wrapper = case retT of
             Right FDouble -> [wrapperFunctionTemplate (templateCnt-1) name (closure ++ init params'::[(Text,Text)]) ]
             otherwise     -> []
-        (reverse -> params',templateCnt) = foldl hideParams ([],0) $ params ++ outParam where
+        (reverse -> params',templateCnt) = foldl' hideParams ([],0) $ params ++ outParam where
             hideParams (ps,cnt) (name,FDouble) = ((name,"double"):ps, cnt)
             hideParams (ps,cnt) (name,FPower{}) = ((name,templateArgName $ cnt+1):ps, cnt+1)
         closure = [(closureParamName,lamIdToClosure lamId)]
