@@ -20,12 +20,7 @@ test = fst rSubdiv
 
 main :: IO ()
 main = do
-    let sizes = makeSizes expr
-        expr' = calcDims expr
-        expr'' = translate expr' sizes
-    T.putStrLn $ printContraction False expr'
-    putStr $ printExpr (Proxy :: Proxy (R '[])) expr''
-    -- result <- compile (".." </> "test") "eval" test
-    -- case result of
-    --     Just expr -> putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) expr
-    --     Nothing -> return ()
+    result <- compile (".." </> "test") "eval" test
+    case result of
+        Just expr -> putStr $ printExpr (Proxy :: Proxy (R '[TypecheckT])) expr
+        Nothing -> return ()

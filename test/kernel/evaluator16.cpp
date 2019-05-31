@@ -32,8 +32,8 @@ template<typename _T1>
 void _lam7(_Cl7 _cl, double x7, double y7, _T1 _result);
 double _lam7(_Cl7 _cl, double x7, double y7);
 template<typename _T1>
-void _lam11(_Cl11 _cl, double x11, double y11, _T1 _result);
-double _lam11(_Cl11 _cl, double x11, double y11);
+void _lam11(_Cl11 _cl, double x111, double x211, _T1 _result);
+double _lam11(_Cl11 _cl, double x111, double x211);
 template<typename _T1, typename _T2, typename _T3>
 void _lam15(_Cl15 _cl, _T1 u115, _T2 u215, _T3 _result);
 template<typename _T1, typename _T2>
@@ -78,13 +78,13 @@ double _lam7(_Cl7 _cl, double x7, double y7) {
     return result;
 }
 template<typename _T1>
-void _lam11(_Cl11 _cl, double x11, double y11, _T1 _result) {
-    _result = (x11) * (y11);
+void _lam11(_Cl11 _cl, double x111, double x211, _T1 _result) {
+    _result = (x111) * (x211);
     
 }
-double _lam11(_Cl11 _cl, double x11, double y11) {
+double _lam11(_Cl11 _cl, double x111, double x211) {
     double result;
-    _lam11(_cl, x11, y11, View<double*, double, to_list_t<>, true>(&result));
+    _lam11(_cl, x111, x211, View<double*, double, to_list_t<>, true>(&result));
     return result;
 }
 template<typename _T1, typename _T2, typename _T3>

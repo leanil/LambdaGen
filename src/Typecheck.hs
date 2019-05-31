@@ -26,7 +26,7 @@ typecheckAlg (_ ::< Scalar _) = Left double
 
 typecheckAlg (_ ::< Variable _ t) = Left t
 
-typecheckAlg (_ ::< View _ d s) = Left $ power' double (zip d s)
+typecheckAlg (_ ::< View _ shape) = Left $ power' double shape
 
 typecheckAlg (_ ::< ScalarOp _ (Left FDouble) (Left FDouble)) = Left double
 typecheckAlg (_ ::< ScalarOp _ (Left a) (Left b)) = Right $ mapMaybe scalarCheck [a,b]

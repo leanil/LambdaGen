@@ -2,8 +2,8 @@
 
 module Naming where 
     
-import Utility (tshow)
-import Data.Text (Text, append, pack)
+import Utility (charShift, tshow)
+import Data.Text (Text, append, pack, singleton)
 
 closureParamName :: Text
 closureParamName = "_cl"
@@ -37,3 +37,9 @@ wrapperSuffix = "w"
 
 tmpSuffix :: Text -- For the temporary storage of reduction
 tmpSuffix = "_tmp"
+
+tensorName :: Int -> Text
+tensorName = singleton . charShift 'A'
+
+indexName :: Int -> Text
+indexName = singleton . charShift 'i'

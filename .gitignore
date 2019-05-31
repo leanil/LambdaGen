@@ -1,4 +1,6 @@
 test/build
+test/contraction
+test/main.cpp
 
 .stack-work/
 LambdaGen.cabal

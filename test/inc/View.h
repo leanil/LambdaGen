@@ -107,6 +107,14 @@ public:
         return *this;
     }
 
+    bool operator==(const View<Ptr, T, List<D, Ds>, IsRef>& other) {
+        for (int i = 0; i < size; ++i) {
+            if (!((*this)[i] == other[i]))
+                return false;
+        }
+        return true;
+    }
+
     auto operator[](int idx) const {
         return View<Ptr, T, Ds, true>(data + idx*D::stride);
     }
@@ -148,6 +156,10 @@ template<typename Ptr, typename T>
 class View<Ptr, T, EmptyList, true> {
 public:
     View(Ptr data) : data(data) {}
+
+    bool operator==(const View<Ptr, T, EmptyList, true>& other) {
+        return *data == *other.data;
+    }
 
     View<Ptr, T, EmptyList, true>& operator=(const View<Ptr, T, EmptyList, true>& other) {
         return this->operator=<true>(other);

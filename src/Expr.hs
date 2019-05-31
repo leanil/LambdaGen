@@ -12,7 +12,7 @@ import Text.Show.Deriving (deriveShow1)
 data ExprF a
     = Scalar { getSclVal :: Double }
     | ScalarOp { getOp :: Char, getOpLeft :: a, getOpRight :: a }
-    | View { getName :: String, getViewDims :: [Int], getViewStrides :: [Int] }
+    | View { getName :: String, getShape :: [(Int,Int)] }
     | Apply { getLambda :: a, getArgs :: [a]}
     | Lambda { getParams :: [(String,Type)], getBindings :: [(String,a)], getLambdaBody :: a }
     | Variable { getName :: String, getVarType :: Type }
@@ -54,7 +54,7 @@ type Expr0 = Expr '[]
 
 pattern FScalar r d               = (r :< Scalar d)
 pattern FScalarOp r op a b        = (r :< ScalarOp op a b)
-pattern FView r id dms strd       = (r :< View id dms strd)
+pattern FView r id shape       = (r :< View id shape)
 pattern FApply r lam vals         = (r :< Apply lam vals)
 pattern FLambda r vars binds body = (r :< Lambda vars binds body)
 pattern FVariable r id t          = (r :< Variable id t)
@@ -74,13 +74,13 @@ mul :: Expr0 -> Expr0 -> Expr0
 mul x y = wrapExprF $ ScalarOp '*' x y
 
 vecView :: String -> [Int] -> Expr0
-vecView i d = wrapExprF $ View i d (defaultStrides d)
+vecView i d = wrapExprF $ View i (defaultStrides d)
 
-vecView' :: String -> [Int] -> [Int] ->Expr0
-vecView' i d s = wrapExprF $ View i d s
+vecView' :: String -> [(Int,Int)] ->Expr0
+vecView' i shape = wrapExprF $ View i shape
 
 transpose :: [Int] -> Expr0 -> Expr0
-transpose p (FView _ i d s) = wrapExprF $ View i (perm p d) (perm p s) where
+transpose p (FView _ i shape) = wrapExprF $ View i (perm p shape) where
     perm p' l = map snd $ sort $ zip p' l
 
 app :: Expr0 -> [Expr0] -> Expr0
@@ -126,9 +126,6 @@ subdiv a b c = wrapExprF $ Subdiv a b c
 
 flatten :: Int -> Expr0 -> Expr0
 flatten a b = wrapExprF $ Flatten a b
-
-defaultStrides :: [Int] -> [Int]
-defaultStrides = tail . scanr (*) 1
 
 isLeafNode :: ExprF a -> Bool
 isLeafNode (Scalar{}) = True

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <numeric>
 #include <sstream>
 #include <string>
@@ -12,5 +14,5 @@ template<typename View>
 bool check(View const& view, std::string expect) {
     std::stringstream ss;
     ss << view;
-    return ss.str() != expect;
+    return ss.str() == expect;
 }

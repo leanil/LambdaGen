@@ -1,18 +1,25 @@
-{-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
+{-# LANGUAGE OverloadedStrings, QuasiQuotes, ViewPatterns #-}
 
 import Compile
+import Generate.Contraction
+import Generate.ContractionText
 import Test.FunctionalTest
+import Utility
 import Control.Comonad (extract)
-import Control.Monad (foldM)
+import Control.Monad (foldM, forM)
 import Data.Functor.Foldable (cata)
 import Data.Text (Text, concat, pack, unpack)
+import qualified Data.Text.IO as T (putStrLn, writeFile)
 import NeatInterpolation
 import Prelude hiding (concat)
-import System.Directory (createDirectoryIfMissing)
+import System.Directory (createDirectoryIfMissing, doesDirectoryExist, removeDirectoryRecursive)
 import System.Exit (ExitCode(..), exitFailure)
-import System.FilePath ((</>),(<.>))
+import System.FilePath (FilePath, (</>),(<.>))
 import System.IO (print)
 import System.Process (cwd, createProcess, proc, waitForProcess)
+
+contractionTestCount :: Int
+contractionTestCount = 10
 
 evalIds :: [String]
 evalIds = (map (("evaluator"++) . show) [1..(length funcTests)])
@@ -25,44 +32,82 @@ createProcessAndExitOnFailure processName args = do
         ExitSuccess -> return ()
         _           -> exitFailure
 
+resetDir :: FilePath -> IO ()
+resetDir path = do
+    exist <- doesDirectoryExist path
+    if exist then removeDirectoryRecursive path else return ()
+    createDirectoryIfMissing True path
+
 main :: IO ()
 main = do
+    resetDir ("test"</>"kernel")
     foldM (\_ (evalId,(test,_)) -> (compile ("test"</>"kernel") evalId test)) Nothing (zip evalIds funcTests) -- TODO: can we fold these whithout a seed?
-    writeFile ("test"</>"main"<.>"cpp") $ unpack $
-        testCode (concat $ map (include . pack) evalIds)
-                 (concat $ zipWith3 switch (map (pack . show) [1..]) (map pack evalIds) (map snd funcTests))
-    createDirectoryIfMissing True $ "test"</>"build"
+    resetDir ("test"</>"contraction")
+    forM [1..contractionTestCount] contractionTest
+    T.writeFile ("test"</>"main"<.>"cpp") $ 
+        testCode (concat $ map (include "h". pack) evalIds ++ 
+                           map (\(tshow -> n) -> include "hpp" [text|cont${n}test|]) [1..contractionTestCount])
+                 (concat $ zipWith3 evalCase (map (pack . show) [1..]) (map pack evalIds) (map snd funcTests) ++
+                           map (\n -> contCase (n+length funcTests) n) [1..contractionTestCount])
+    resetDir ("test"</>"build")
     createProcessAndExitOnFailure "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
     createProcessAndExitOnFailure "cmake" ["--build", "."]
     createProcessAndExitOnFailure "ctest" []
 
 testCode :: Text -> Text -> Text
-testCode includeText switchText =
-    [text|
-        $includeText
-        #include "tester.hpp"
-        #include <cstdlib>
+testCode includeText switchText = purge [text|
+    $includeText
+    #include "tester.hpp"
+    #include <cstdlib>
 
-        int main(int argc, char** argv) {
-            std::map<std::string, double*> bigVectors{
-                { "vec", gen_seq(7,3) },
-                { "mat", gen_seq(1,6) },
-                { "a", gen_seq(1,3) },
-                { "b", gen_seq(1,3) },
-                { "mat8", gen_seq(1,8) },
-                { "tens", gen_seq(1,24) },
-                { "M1", gen_seq(1,6) },
-                { "M2", gen_seq(7,12) }
-            };
-            switch (atoi(argv[1])) {
-            $switchText
-            default: return 1;
-            }
+    int main(int argc, char** argv) {
+        std::map<std::string, double*> bigVectors{
+            { "vec", gen_seq(7,3) },
+            { "mat", gen_seq(1,6) },
+            { "a", gen_seq(1,3) },
+            { "b", gen_seq(1,3) },
+            { "mat8", gen_seq(1,8) },
+            { "tens", gen_seq(1,24) },
+            { "M1", gen_seq(1,6) },
+            { "M2", gen_seq(7,12) }
+        };
+        switch (atoi(argv[1])) {
+        $switchText
+        default: return 1;
+        }
+    }|]
+
+include :: Text -> Text -> Text
+include ext evalId = [text|#include "$evalId.$ext"|]
+
+evalCase :: Text -> Text -> Text -> Text
+evalCase caseNum evalId expect = [text|case $caseNum: return !check($evalId(bigVectors), "$expect");|]
+
+contCase :: Int -> Int -> Text
+contCase (tshow -> caseNum) (tshow -> n) = [text|case $caseNum: return !cont${n}test();|]
+
+contractionTest :: Int -> IO ()
+contractionTest num = do
+    expr <- sample
+    let sizes = makeSizes expr
+        test = translate sizes expr
+        path = "test" </> "contraction"
+        evalName = "cont" ++ show num
+        exprText = printContraction False expr
+    compile path evalName test
+    T.writeFile (path </> (evalName ++ "test") <.> "hpp") $ 
+        contractionTestCode num exprText (initData sizes expr) (makeEvaluator sizes expr)
+
+contractionTestCode :: Int -> Text -> Text -> Text -> Text
+contractionTestCode (tshow -> num) exprText tensorMap evaluator =
+    purge [text|
+        //$exprText
+        #include "cont$num.h"
+        #include "tester.hpp"
+
+        bool cont${num}test() {
+            $tensorMap
+            $evaluator
+            return cont$num(userData) == R;
         }
     |]
-
-include :: Text -> Text
-include evalId = [text|#include "$evalId.h"|]
-
-switch :: Text -> Text -> Text -> Text
-switch caseNum evalId expect = [text|case $caseNum: return check($evalId(bigVectors), "$expect");|]

@@ -9,9 +9,12 @@ sclAdd = let x = var "x" double
          in  lam [x,y] (add x y)
 
 sclMul :: Expr0
-sclMul = let x = var "x" double
-             y = var "y" double
-         in  lam [x,y] (mul x y)
+sclMul = sclMulN 2
+
+sclMulN :: Int -> Expr0
+sclMulN 1 = lam [x] (x) where x = var "x" double
+sclMulN n = lam params $ foldl (\expr arg -> mul expr arg) (mul (params !! 0) (params !! 1)) (drop 2 params) where
+    params = map (\x -> var ("x" ++ show x) double) [1..n]
 
 sclVecMul :: Int -> Expr0
 sclVecMul d = let x = var "x" double

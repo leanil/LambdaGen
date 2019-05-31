@@ -7,7 +7,7 @@ import Expr
 import Naming
 import StorageClosureConv
 import Type
-import Utility (mapFst, tshow)
+import Utility (mapFst, purge, tshow)
 import Control.Arrow ((&&&))
 import Data.List (foldl')
 import Data.Maybe (isJust, maybeToList)
@@ -34,13 +34,13 @@ scalarTemplate result (tshow -> x) = case result of
         LetBound name -> CodeT name (initTemplate "double" name x)
         None -> CodeT x ""
 
-viewTemplate :: StoreResult -> Text -> Text -> [Int] -> [Int] -> Text -> CodeT
-viewTemplate result pointerT dataT dims strides dataName = case result of
+viewTemplate :: StoreResult -> Text -> Text -> [(Int,Int)] -> Text -> CodeT
+viewTemplate result pointerT dataT shape dataName = case result of
     OutParam -> CodeT outParamName (assignTemplate outParamName code)
     Tensor name -> CodeT name [text|$viewT $name(userData->at("$dataName"));|]
     None -> CodeT code "" -- never fires, even though it could in function arguments and final return value
     where
-        viewT = viewTypeTemplate pointerT dataT (dims,strides)
+        viewT = viewTypeTemplate pointerT dataT shape
         code = strip [text|$viewT(userData->at("$dataName"))|]
 
 varTemplate :: String -> Bool -> Text
@@ -138,7 +138,7 @@ wrapperFunctionTemplate templateCnt funName params =
 
 cppType :: Type -> Text
 cppType FDouble = "double"
-cppType (FPower _ dims) = viewTypeTemplate "double*" "double" (unzip dims)
+cppType (FPower _ dims) = viewTypeTemplate "double*" "double" dims
 
 cppExType :: ExType -> Text
 cppExType = either lamIdToClosure cppType
@@ -211,7 +211,7 @@ zipTemplate (zipId, (_, zipIdToName -> hofName)) =
     where
         (clZip,lamZip) = lamIdToClosure &&& lamIdToName $ zipId
 
-layoutOpTemplate :: Text -> StoreResult -> LayoutOp -> ([Int],[Int]) -> Text -> CodeT
+layoutOpTemplate :: Text -> StoreResult -> LayoutOp -> [(Int,Int)] -> Text -> CodeT
 layoutOpTemplate eval result layout shape code = case result of
     OutParam -> CodeT outParamName (append eval $ assignTemplate outParamName code')
     Tensor name -> CodeT name (append eval $ initTemplate viewT name code')
@@ -226,11 +226,11 @@ viewDimElemTemplate :: (Int, Int) -> Text
 viewDimElemTemplate (tshow -> size, tshow -> stride) =
     strip [text|P<$size,$stride>|]
 
-viewDimListTemplate :: ([Int], [Int]) -> Text
-viewDimListTemplate (intercalate ", " . map viewDimElemTemplate . uncurry zip -> dims) =
+viewDimListTemplate :: [(Int,Int)] -> Text
+viewDimListTemplate (intercalate ", " . map viewDimElemTemplate -> dims) =
     [text|to_list_t<$dims>|]
 
-viewTypeTemplate :: Text -> Text -> ([Int], [Int]) -> Text
+viewTypeTemplate :: Text -> Text -> [(Int,Int)] -> Text
 viewTypeTemplate pointerT dataT (viewDimListTemplate -> dims) =
     [text|View<$pointerT, $dataT, $dims>|]
 
@@ -244,7 +244,7 @@ closureTemplate (lamIdToClosure -> clName) vars =
 allocTemplate :: Storage -> Text
 allocTemplate (Storage memId ty) = case ty of
     FPower _ shape -> [text|$viewT $memId;|] where
-        viewT = viewTypeTemplate "double*" "double" (unzip $ shape)
+        viewT = viewTypeTemplate "double*" "double" shape
     FDouble -> [text|double $memId;|]
 
 funDefTemplate :: Text -> Text -> Text
@@ -258,7 +258,6 @@ cpuEvaluatorTemplate closures storage funs retT evalName eval code =
     (purge $ cpuHeaderTemplate retT' evalName,
     purge $ cpuCppTemplate closures' allocs funDecls funDefs retT' evalName eval code)
     where
-        purge = filter (\c -> c /= '\r')
         closures' = concat $ map (uncurry closureTemplate) closures
         allocs = concat $ map allocTemplate storage
         funDecls = concat $ map ((`append` ";\n") . strip . fst) funs

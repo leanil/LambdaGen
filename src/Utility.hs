@@ -1,7 +1,8 @@
 module Utility where
 
+import Data.Char (chr, ord)
 import Data.List (sort, sortBy)
-import Data.Text (Text, pack)
+import Data.Text (Text, filter, pack)
 
 tshow :: Show a => a -> Text
 tshow = pack . show
@@ -40,3 +41,9 @@ intersectWithIndex a b = helper (sort $ zip a [0..]) (sort $ zip b [0..]) where
                                 | p < q = helper xs y
                                 | p > q = helper x ys
                             helper _ _ = []
+
+charShift :: Char -> Int -> Char
+charShift c n = chr $ ord c + n
+
+purge :: Text -> Text
+purge = Data.Text.filter (\c -> c /= '\r')

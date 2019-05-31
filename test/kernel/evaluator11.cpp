@@ -13,8 +13,8 @@ View<double*, double, to_list_t<P<3,1>>> _t11;
 View<double*, double, to_list_t<P<3,1>>> _t10;
 
 template<typename _T1>
-void _lam4(_Cl4 _cl, double y3, _T1 _result);
-double _lam4(_Cl4 _cl, double y3);
+void _lam4(_Cl4 _cl, double x23, _T1 _result);
+double _lam4(_Cl4 _cl, double x23);
 template<typename _T1>
 void _lam8(_Cl8 _cl, double x9, _T1 _result);
 double _lam8(_Cl8 _cl, double x9);
@@ -24,14 +24,14 @@ template<typename _T1, typename... _T>
 void _zip0(_Cl8 _clZip, _T1 _result, _T... vecs);
 
 template<typename _T1>
-void _lam4(_Cl4 _cl, double y3, _T1 _result) {
-    double x3 = 2.0;
-    _result = (x3) * (y3);
+void _lam4(_Cl4 _cl, double x23, _T1 _result) {
+    double x13 = 2.0;
+    _result = (x13) * (x23);
     
 }
-double _lam4(_Cl4 _cl, double y3) {
+double _lam4(_Cl4 _cl, double x23) {
     double result;
-    _lam4(_cl, y3, View<double*, double, to_list_t<>, true>(&result));
+    _lam4(_cl, x23, View<double*, double, to_list_t<>, true>(&result));
     return result;
 }
 template<typename _T1>

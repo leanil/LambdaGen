@@ -23,14 +23,6 @@ type CoAlgebra t a = a -> Base t a
 type MAlgebra t m a = Base t a -> m a
 type MRAlgebra t m a = Base t (t, a) -> m a
 type MCoAlgebra t m a = a -> m (Base t a)
-
-annotateCata :: Functor f => ((t, f new) -> new) -> ((t, f (Cofree f (t, new))) -> Cofree f (t, new))
-annotateCata alg (old, f) = (old,new) :< f where
-    new = alg (old, fmap (\((_,n) :< _) -> n) f)
-
-annotateAna' :: Functor f => ((Cofree f t, seed) -> (new, f (Cofree f t, seed))) -> ((Cofree f t, seed) -> ((t, new), f (Cofree f t, seed)))
-annotateAna' alg a@(old :< _, _) = ((old, new), f) where
-    (new, f) = alg a
     
 annotate :: Functor f => 
             Algebra (Cofree f (R old)) new ->
@@ -64,6 +56,10 @@ annotateAnaM2 :: (Functor f, Monad m) =>
                MCoAlgebra (Cofree f (R (boxed ': old))) m (Cofree f (R old), seed)
 annotateAnaM2 box alg a@(old :< _,_) = fmap (appendFields2 box old) $ alg a
 
+--ignoreAlg :: Algebra t a -> Algebra (Cofree (Base t) b) a
+ignoreAlg :: (f a -> a) -> (CofreeF f b a -> a)
+ignoreAlg alg (_ ::< expr) = alg expr
+
 appendFields :: R old -> CofreeF f new b -> CofreeF f (R (new : old)) b
 appendFields old (new ::< node) = (Identity new :& old) ::< node
 
@@ -72,9 +68,6 @@ appendFields2 box old (new ::< node) = (Identity (box new) :& old) ::< node
 
 fieldVal :: a ∈ fields => R fields -> a
 fieldVal = getIdentity . rget
-
-getAnnot :: Cofree f a -> a
-getAnnot (a :< _) = a
 
 cataM :: (Monad m, Traversable (Base t), Recursive t) => (Base t a -> m a) -> t ->  m a
 cataM alg = c where c = alg <=< traverse c . project

@@ -42,7 +42,7 @@ cpuCodeGenAlg (r ::< node) =
 
         Scalar x -> return $ scalarTemplate resultName x
 
-        View name dims strides -> return $ viewTemplate resultName "double*" "double" dims strides (pack name)
+        View name shape -> return $ viewTemplate resultName "double*" "double" shape (pack name)
 
         Variable name _ -> return $ variableTemplate (getLetId $ fieldVal r) resultName name (isFreeVar $ fieldVal r)
 
@@ -68,7 +68,7 @@ cpuCodeGenAlg (r ::< node) =
 
         LayoutOp op (_,code) ->
             return $ layoutOpTemplate eval resultName op shape code where
-                shape = case getType r of FPower _ s -> unzip s          
+                shape = case getType r of FPower _ s -> s          
 
 textToMaybe :: Text -> Maybe Text
 textToMaybe "" = Nothing

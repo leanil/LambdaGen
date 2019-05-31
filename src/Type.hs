@@ -34,7 +34,7 @@ double :: Type
 double = Fix Double
 
 power :: Type -> [Int] -> Type
-power x y = power' x $ zip y $ tail $ scanr (*) 1 y
+power x y = power' x $ defaultStrides y
 
 power' :: Type -> [(Int,Int)] -> Type
 power' x y = Fix $ Power x y
@@ -62,3 +62,6 @@ raiseToPower t a = power t [a]
 size :: Type -> Int
 size (FPower _ ((s,_):_)) = s
 size a = error $ "size on non-array type " ++ (showT a)
+
+defaultStrides :: [Int] -> [(Int,Int)]
+defaultStrides xs = zip xs $ tail $ scanr (*) 1 xs
