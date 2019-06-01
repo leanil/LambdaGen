@@ -99,22 +99,25 @@ makeSizes = fromSet (+2) . cata (ignoreAlg alg) where
     alg (TensorF _ idxs) = Set.fromList idxs
     alg (SumF _ ops) = Set.unions ops
 
+type ShapedExpr = ([Int], Expr0)
 translate :: Extents -> ContEq -> Expr0
 translate sizes expr = evalState (paraM alg expr) 0 where
     alg :: MRAlgebra ContEq (State Int) Expr0
     alg (_ ::< TensorF (unpack . tensorName -> name) ind) =
         return $ vecView name $ map (sizes !) ind
     alg (free ::< SumF sumId (map (mapFst extract) -> ops)) = do
-        let mapDim :: ([([Int], Expr0)], Expr0 -> Expr0) -> Int -> State Int ([([Int], Expr0)], Expr0 -> Expr0)
+        -- Peel off a single dimension from all arguments, and compose the resulting map to the earlier ones
+        let mapDim :: ([ShapedExpr], Expr0 -> Expr0) -> Int -> State Int ([ShapedExpr], Expr0 -> Expr0)
             mapDim (xs,f) i = do
-                let consumeDim :: Int -> ([Int], Expr0) -> ([([Int], Expr0)], [(Expr0,Expr0)]) -> State Int ([([Int], Expr0)], [(Expr0,Expr0)])
+                -- process a single argument, and replace it with a new variable if the outer dimension matches
+                let consumeDim :: Int -> ShapedExpr -> ([ShapedExpr], [(Expr0,Expr0)]) -> State Int ([ShapedExpr], [(Expr0,Expr0)])
                     --consumeDim _ _ x@([],_) = return (x:xs, ys)
                     consumeDim i x@((i0:is), e) (xs,ys) 
                         | i0 /= i = return (x:xs,ys)
                         | otherwise = do
                             nextId <- get
                             put $ nextId + 1
-                            let param = var [charShift 'a' nextId] (power double $ map (sizes !) is)
+                            let param = var ("a" ++ show nextId) (power double $ map (sizes !) is)
                             return ((is, param):xs, (param,e):ys)
                 (xs', unzip -> (params, args)) <- foldrM (consumeDim i) ([],[]) xs 
                 return $ (xs', \e -> f $ mkZipWithN (lam params e) args)

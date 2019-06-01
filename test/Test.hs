@@ -9,7 +9,7 @@ import Control.Comonad (extract)
 import Control.Monad (foldM, forM)
 import Data.Functor.Foldable (cata)
 import Data.Text (Text, concat, pack, unpack)
-import qualified Data.Text.IO as T (putStrLn, writeFile)
+import qualified Data.Text.IO as T (putStr, putStrLn, writeFile)
 import NeatInterpolation
 import Prelude hiding (concat)
 import System.Directory (createDirectoryIfMissing, doesDirectoryExist, removeDirectoryRecursive)
@@ -20,6 +20,8 @@ import System.Process (cwd, createProcess, proc, waitForProcess)
 
 contractionTestCount :: Int
 contractionTestCount = 10
+contIds :: [Int]
+contIds = [1..contractionTestCount]
 
 evalIds :: [String]
 evalIds = (map (("evaluator"++) . show) [1..(length funcTests)])
@@ -41,15 +43,15 @@ resetDir path = do
 main :: IO ()
 main = do
     resetDir ("test"</>"kernel")
-    foldM (\_ (evalId,(test,_)) -> (compile ("test"</>"kernel") evalId test)) Nothing (zip evalIds funcTests) -- TODO: can we fold these whithout a seed?
     resetDir ("test"</>"contraction")
-    forM [1..contractionTestCount] contractionTest
-    T.writeFile ("test"</>"main"<.>"cpp") $ 
-        testCode (concat $ map (include "h". pack) evalIds ++ 
-                           map (\(tshow -> n) -> include "hpp" [text|cont${n}test|]) [1..contractionTestCount])
-                 (concat $ zipWith3 evalCase (map (pack . show) [1..]) (map pack evalIds) (map snd funcTests) ++
-                           map (\n -> contCase (n+length funcTests) n) [1..contractionTestCount])
     resetDir ("test"</>"build")
+    foldM (\_ (evalId,(test,_)) -> (compile ("test"</>"kernel") evalId test)) Nothing (zip evalIds funcTests) -- TODO: can we fold these whithout a seed?
+    putStrLn "Random generated contractions:"
+    forM contIds contractionTest
+    T.writeFile ("test"</>"main"<.>"cpp") $ 
+        testCode (concat $ map (include "h". pack) evalIds ++ map ((\n -> include "hpp" [text|cont${n}test|]) . tshow) contIds)
+                 (concat $ zipWith3 evalCase (map tshow [1..]) (map pack evalIds) (map snd funcTests) ++
+                           map (\n -> contCase (n+length funcTests) n) contIds)
     createProcessAndExitOnFailure "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
     createProcessAndExitOnFailure "cmake" ["--build", "."]
     createProcessAndExitOnFailure "ctest" []
@@ -95,6 +97,7 @@ contractionTest num = do
         evalName = "cont" ++ show num
         exprText = printContraction False expr
     compile path evalName test
+    let n = tshow num in T.putStr [text|$n) $exprText|]
     T.writeFile (path </> (evalName ++ "test") <.> "hpp") $ 
         contractionTestCode num exprText (initData sizes expr) (makeEvaluator sizes expr)
 

@@ -155,8 +155,9 @@ std::ostream& operator<<(std::ostream& out, const View<Ptr, T, Dims, IsRef>& v) 
 template<typename Ptr, typename T>
 class View<Ptr, T, EmptyList, true> {
 public:
+    View() : data(&val) {}
     View(Ptr data) : data(data) {}
-
+    
     bool operator==(const View<Ptr, T, EmptyList, true>& other) {
         return *data == *other.data;
     }
@@ -180,6 +181,7 @@ public:
     }
 
     Ptr const data;
+    T val;
 };
 
 // Specialization for holding single scalar partial results / temporaries.
