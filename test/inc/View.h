@@ -1,6 +1,8 @@
 #pragma once
 
 #include "List.h"
+#include <algorithm>
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -22,7 +24,7 @@ struct Subdiv<I, B, List<H, T>> {
 
 template<int B, int D, int S, typename T>
 struct Subdiv<0, B, List<P<D, S>, T>> {
-    using type = List<P<D/B, B*S>, List<P<B, S>, T>>;
+    using type = List<P<D / B, B*S>, List<P<B, S>, T>>;
 };
 
 template<int I, int B, typename S>
@@ -37,7 +39,7 @@ struct Flatten<I, List<H, T>> {
 
 template<int D1, int S1, int D2, int S2, typename T>
 struct Flatten<0, List<P<D1, S1>, List<P<D2, S2>, T>>> {
-    using type = List<P<D1*D2,S2>, T>;
+    using type = List<P<D1*D2, S2>, T>;
 };
 
 template<int I, typename S>
@@ -107,7 +109,7 @@ public:
         return *this;
     }
 
-    bool operator==(const View<Ptr, T, List<D, Ds>, IsRef>& other) {
+    bool operator==(const View<Ptr, T, List<D, Ds>, IsRef>& other) const {
         for (int i = 0; i < size; ++i) {
             if (!((*this)[i] == other[i]))
                 return false;
@@ -116,7 +118,7 @@ public:
     }
 
     auto operator[](int idx) const {
-        return View<Ptr, T, Ds, true>(data + idx*D::stride);
+        return View<Ptr, T, Ds, true>(data + idx * D::stride);
     }
 
     //template<typename I, typename... Idx>
@@ -157,9 +159,10 @@ class View<Ptr, T, EmptyList, true> {
 public:
     View() : data(&val) {}
     View(Ptr data) : data(data) {}
-    
-    bool operator==(const View<Ptr, T, EmptyList, true>& other) {
-        return *data == *other.data;
+
+    bool operator==(const View<Ptr, T, EmptyList, true>& other) const {
+        double abs_err = std::abs(*data - *other.data), rel_err = abs_err / *data;
+        return std::min(abs_err, rel_err) < 1e-6;
     }
 
     View<Ptr, T, EmptyList, true>& operator=(const View<Ptr, T, EmptyList, true>& other) {

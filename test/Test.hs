@@ -111,6 +111,6 @@ contractionTestCode (tshow -> num) exprText tensorMap evaluator =
         bool cont${num}test() {
             $tensorMap
             $evaluator
-            return cont$num(userData) == R;
+            return viewEq(cont$num(userData),R);
         }
     |]

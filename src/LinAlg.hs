@@ -13,7 +13,7 @@ sclMul = sclMulN 2
 
 sclMulN :: Int -> Expr0
 sclMulN 1 = lam [x] (x) where x = var "x" double
-sclMulN n = lam params $ foldl (\expr arg -> mul expr arg) (mul (params !! 0) (params !! 1)) (drop 2 params) where
+sclMulN n = lam params $ foldl (\expr arg -> mul expr arg) (head params) (tail params) where
     params = map (\x -> var ("x" ++ show x) double) [1..n]
 
 sclVecMul :: Int -> Expr0

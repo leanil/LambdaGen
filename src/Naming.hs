@@ -39,7 +39,11 @@ tmpSuffix :: Text -- For the temporary storage of reduction
 tmpSuffix = "_tmp"
 
 tensorName :: Int -> Text
-tensorName = singleton . charShift 'A'
+tensorName n
+    | n < 10 = singleton $ charShift 'A' n
+    | otherwise = append "T" $ tshow n
 
 indexName :: Int -> Text
-indexName = singleton . charShift 'i'
+indexName n
+    | n < 18 = singleton $ charShift 'i' n
+    | otherwise = append "i" $ tshow n

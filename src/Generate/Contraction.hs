@@ -17,11 +17,11 @@ import Control.Monad.State (State, StateT, evalState, evalStateT, get, modify, p
 import Data.Foldable (foldrM)
 import Data.Functor.Foldable (Base, cata)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
-import Data.List (foldl')
+import Data.List (foldl', partition)
 import Data.List.Ordered (has, member, minus, union)
 import Data.Map.Strict (Map, (!), fromSet)
 import Data.Maybe (isJust)
-import qualified Data.Set as Set (Set,fromList, unions)
+import qualified Data.Set as Set (Set, fromList, insert, unions)
 import Data.Text (unpack)
 import Hedgehog (Gen, MonadGen)
 import qualified Hedgehog.Gen as Gen (choice, filter, int, list, recursive, sample, subsequence)
@@ -36,8 +36,8 @@ makeBaseFunctor ''ContExpr
 
 expr = calcDims $ Sum 1 [Tensor 0 [0,1], Sum 2 [Tensor 1 [0,1,2], Tensor 2 [1,2]]]
 
-nodeCount :: ContExpr -> Int
-nodeCount = cata (\case TensorF{} -> 1; SumF _ ops -> sum ops)
+leafCount :: ContExpr -> Int
+leafCount = cata (\case TensorF{} -> 1; SumF _ ops -> sum ops)
 
 type ContEq = Cofree ContExprF [Int] -- A contraction equation, each subexpression annotated with its shape
 
@@ -55,14 +55,14 @@ data GenState = GenState { tensorId :: Int, sumId :: Int }
 genContExpr :: StateT GenState Gen ContExpr
 genContExpr = do
     resDims <- Gen.int $ Range.constant 0 2
-    let noConstResult xs = if and $ map (has xs) [0..resDims-1] then Just () else Nothing
-        alg (TensorF _ xs) = Just xs
-        alg (SumF i ops) = case (and $ map (member i) ops) of
-                                True -> Just $ foldl' union [] ops
-                                False -> Nothing
-        noConstSum = isJust . (noConstResult <=< cataM alg)
-        initGenExpr = do put $ GenState 0 resDims; genExpr [0..resDims-1]
-    Gen.filter (\a -> noConstSum a && nodeCount a > 3) $ initGenExpr
+    let initGenExpr = do put $ GenState 0 resDims; genExpr [0..resDims-1]
+    --     noConstResult xs = if and $ map (has xs) [0..resDims-1] then Just () else Nothing
+    --     alg (TensorF _ xs) = Just xs
+    --     alg (SumF i ops) = case (and $ map (member i) ops) of
+    --                             True -> Just $ foldl' union [] ops
+    --                             False -> Nothing
+    --     noConstSum = isJust . (noConstResult <=< cataM alg)
+    Gen.filter (\a -> let x = leafCount a in x > 3 && x < 20) $ initGenExpr
 
 genExpr :: [Int] -> StateT GenState Gen ContExpr
 genExpr xs = Gen.recursive Gen.choice
@@ -97,7 +97,7 @@ makeSizes :: ContEq -> Extents
 makeSizes = fromSet (+2) . cata (ignoreAlg alg) where
     alg :: ContExprF (Set.Set Int) -> Set.Set Int
     alg (TensorF _ idxs) = Set.fromList idxs
-    alg (SumF _ ops) = Set.unions ops
+    alg (SumF idx ops) = Set.insert idx $ Set.unions ops
 
 type ShapedExpr = ([Int], Expr0)
 translate :: Extents -> ContEq -> Expr0
@@ -111,16 +111,18 @@ translate sizes expr = evalState (paraM alg expr) 0 where
             mapDim (xs,f) i = do
                 -- process a single argument, and replace it with a new variable if the outer dimension matches
                 let consumeDim :: Int -> ShapedExpr -> ([ShapedExpr], [(Expr0,Expr0)]) -> State Int ([ShapedExpr], [(Expr0,Expr0)])
-                    --consumeDim _ _ x@([],_) = return (x:xs, ys)
+                    consumeDim _ x@([],_) (xs,ys) = return (x:xs, ys)
                     consumeDim i x@((i0:is), e) (xs,ys) 
                         | i0 /= i = return (x:xs,ys)
                         | otherwise = do
                             nextId <- get
                             put $ nextId + 1
-                            let param = var ("a" ++ show nextId) (power double $ map (sizes !) is)
+                            let param = var ("a" ++ show nextId) (if null is then double else power double $ map (sizes !) is)
                             return ((is, param):xs, (param,e):ys)
                 (xs', unzip -> (params, args)) <- foldrM (consumeDim i) ([],[]) xs 
-                return $ (xs', \e -> f $ mkZipWithN (lam params e) args)
+                return $ (xs', if null params then f else \e -> f $ mkZipWithN (lam params e) args)
         (ops',maps) <- foldM mapDim (ops,id) free 
-        let red = mkRnZ sclAdd (sclMulN $ length ops) (map snd ops')
+        let (map snd -> scalars,map snd -> vec) = partition (null . fst) ops'
+            factors = scalars ++ if null vec then [scl $ fromIntegral $ sizes ! sumId] else [mkRnZ sclAdd (sclMulN $ length vec) vec]
+            red = case factors of [x] -> x; (x:xs) -> foldl (\expr arg -> mul expr arg) x xs
         return $ maps red
