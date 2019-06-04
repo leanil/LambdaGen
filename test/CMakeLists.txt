@@ -6,16 +6,14 @@ FILE(GLOB KERNELS kernel/evaluator*.cpp)
 FILE(GLOB CONTRACTIONS contraction/cont*.cpp)
 
 add_executable(LambdaGen main.cpp
-                         inc/helper.h
-                         inc/List.h
-                         inc/my_sycl.h
-                         inc/View.h
-                         inc/tester.hpp
+                         ../tensor/List.h
+                         ../tensor/View.h
+                         ../tensor/util.hpp
                          ${KERNELS}
                          ${CONTRACTIONS})
                     
 target_include_directories(LambdaGen PRIVATE 
-                           inc
+                           ../tensor
                            kernel
                            contraction)
 

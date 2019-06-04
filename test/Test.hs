@@ -53,25 +53,25 @@ main = do
                  (concat $ zipWith3 evalCase (map tshow [1..]) (map pack evalIds) (map snd funcTests) ++
                            map (\n -> contCase (n+length funcTests) n) contIds)
     createProcessAndExitOnFailure "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
-    createProcessAndExitOnFailure "cmake" ["--build", "."]
+    createProcessAndExitOnFailure "cmake" ["--build", ".", "--config", "Release"]
     createProcessAndExitOnFailure "ctest" []
 
 testCode :: Text -> Text -> Text
 testCode includeText switchText = purge [text|
     $includeText
-    #include "tester.hpp"
+    #include "util.hpp"
     #include <cstdlib>
 
     int main(int argc, char** argv) {
         std::map<std::string, double*> bigVectors{
-            { "vec", gen_seq(7,3) },
-            { "mat", gen_seq(1,6) },
-            { "a", gen_seq(1,3) },
-            { "b", gen_seq(1,3) },
-            { "mat8", gen_seq(1,8) },
-            { "tens", gen_seq(1,24) },
-            { "M1", gen_seq(1,6) },
-            { "M2", gen_seq(7,12) }
+            { "vec", init_data(7,3) },
+            { "mat", init_data(1,6) },
+            { "a", init_data(1,3) },
+            { "b", init_data(1,3) },
+            { "mat8", init_data(1,8) },
+            { "tens", init_data(1,24) },
+            { "M1", init_data(1,6) },
+            { "M2", init_data(7,12) }
         };
         switch (atoi(argv[1])) {
         $switchText
@@ -106,7 +106,7 @@ contractionTestCode (tshow -> num) exprText tensorMap evaluator =
     purge [text|
         //$exprText
         #include "cont$num.h"
-        #include "tester.hpp"
+        #include "util.hpp"
 
         bool cont${num}test() {
             $tensorMap

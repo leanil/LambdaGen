@@ -45,7 +45,7 @@ collectSizes dims = cata (ignoreAlg alg) where
     alg (SumF _ ops) = unions ops
 
 tensorMapElem :: Text -> [Int] -> Text
-tensorMapElem name (tshow . product -> size) = stripEnd [text|{ "$name", gen_seq(1,$size) }|]
+tensorMapElem name (tshow . product -> size) = stripEnd [text|{ "$name", init_data(1,$size) }|]
 
 initView :: Bool -> Text -> [Int] -> Text
 initView input name dims = [text|$viewT $name$init;|] where
