@@ -28,8 +28,9 @@ typecheckAlg (_ ::< Variable _ t) = Left t
 
 typecheckAlg (_ ::< View _ shape) = Left $ power' double shape
 
-typecheckAlg (_ ::< ScalarOp _ (Left FDouble) (Left FDouble)) = Left double
-typecheckAlg (_ ::< ScalarOp _ (Left a) (Left b)) = Right $ mapMaybe scalarCheck [a,b]
+typecheckAlg (_ ::< ScalarOp _ (Left a) (Left b)) = case mapMaybe scalarCheck [a,b] of
+    [] -> Left double
+    errs -> Right errs 
 
 typecheckAlg (_ ::< Apply (Left (FArrow a b)) (allLeft -> Just c))
     | length c > length a = Right ["more arguments than lambda parameters in Apply"]
@@ -94,6 +95,7 @@ eqCheck a b
 
 scalarCheck :: Type -> Maybe Error
 scalarCheck (FDouble) = Nothing
+scalarCheck (FPower FDouble []) = Nothing
 scalarCheck a = Just $ showT a ++ " not a scalar"
 
 lambdaCheck :: Type -> Maybe Error

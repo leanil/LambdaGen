@@ -11,7 +11,7 @@ import Utility
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
 import Data.Functor.Foldable (cata, para)
-import Data.Map.Strict (Map, (!), singleton, toList, unions)
+import Data.Map.Strict (Map, singleton, toList, unions)
 import Data.Text (Text, append, intercalate, stripEnd)
 import Data.Text as T (concat, cons)
 import NeatInterpolation
@@ -37,11 +37,11 @@ initData sizes expr =
 
 initViews :: Extents -> ContEq -> Text
 initViews sizes expr = T.concat $ map (uncurry $ initView True) (toList $ collectSizes sizes expr) ++ 
-                                  [initView False "R" $ map (sizes !) $ extract expr]
+                                  [initView False "R" $ map sizes $ extract expr]
 
 collectSizes :: Extents -> ContEq -> Map Text [Int]
 collectSizes dims = cata (ignoreAlg alg) where
-    alg (TensorF (tensorName -> name) idxs) = singleton name $ map (dims !) idxs
+    alg (TensorF (tensorName -> name) idxs) = singleton name $ map dims idxs
     alg (SumF _ ops) = unions ops
 
 tensorMapElem :: Text -> [Int] -> Text
@@ -54,14 +54,14 @@ initView input name dims = [text|$viewT $name$init;|] where
 
 makeEvaluator :: Extents -> ContEq -> Text -- Generate the for loops that calculate the contraction
 makeEvaluator sizes expr@(free :< SumF (indexName -> idx) _) = append (initViews sizes expr) loops where
-    loops = foldr (\x t -> for (indexName x) (sizes ! x) t) body free
+    loops = foldr (\x t -> for (indexName x) (sizes x) t) body free
     body = [text|
         $core
         $result = sum_$idx;|]
     core = para alg expr
     result = index "R" free
     alg (_ ::< TensorF (tensorName -> name) idxs) = index name idxs
-    alg (_ ::< SumF idx ops) = append [text|double sum_$i = 0;|] $ for i (sizes ! idx) body where
+    alg (_ ::< SumF idx ops) = append [text|double sum_$i = 0;|] $ for i (sizes idx) body where
         i = indexName idx
         body = [text|
             double prod = 1;

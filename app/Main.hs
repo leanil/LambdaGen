@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds, OverloadedStrings #-}
 
 import Compile
 import Expr

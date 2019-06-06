@@ -47,3 +47,7 @@ charShift c n = chr $ ord c + n
 
 purge :: Text -> Text
 purge = Data.Text.filter (\c -> c /= '\r')
+
+iterateN :: Int -> (a->a) -> a -> [a]
+iterateN 0 _ _ = []
+iterateN n f x = x : iterateN (n-1) f (f x)

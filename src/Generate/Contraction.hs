@@ -19,7 +19,6 @@ import Data.Functor.Foldable (Base, cata)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.List (foldl', partition)
 import Data.List.Ordered (has, member, minus, union)
-import Data.Map.Strict (Map, (!), fromSet)
 import Data.Maybe (isJust)
 import qualified Data.Set as Set (Set, fromList, insert, unions)
 import Data.Text (unpack)
@@ -80,31 +79,42 @@ genExpr xs = Gen.recursive Gen.choice
                     pure $ Sum nextId ops
             ]
 
+genSimple :: StateT Int Gen ContExpr
+genSimple = do
+    resDims <- Gen.int $ Range.constant 0 2
+    let genLeaf = do
+            nextId <- get
+            subs <- subsequence (0,4) [0..resDims]
+            modify (+1)
+            pure $ Tensor nextId subs
+    ops <- Gen.list (Range.constant 1 4) genLeaf
+    pure $ Sum resDims ops
+
 subsequence :: MonadGen m => (Int,Int) -> [a] -> m [a]
 subsequence (minLength,maxLength) xs = Gen.filter (\case (length -> l) -> minLength <= l && l <= maxLength) (Gen.subsequence xs)
   
 sample :: IO ContEq
 sample = calcDims <$> (Gen.sample $ evalStateT genContExpr $ GenState 0 0)
 
+sampleSimple :: IO ContEq
+sampleSimple = calcDims <$> (Gen.sample $ evalStateT genSimple 0)
+
 randomContraction :: IO Expr0
 randomContraction = do
     expr <- sample
-    let sizes = makeSizes expr
-    return $ translate sizes expr
+    return $ translate smallSizes expr
 
-type Extents = Map Int Int
-makeSizes :: ContEq -> Extents
-makeSizes = fromSet (+2) . cata (ignoreAlg alg) where
-    alg :: ContExprF (Set.Set Int) -> Set.Set Int
-    alg (TensorF _ idxs) = Set.fromList idxs
-    alg (SumF idx ops) = Set.insert idx $ Set.unions ops
+type Extents = Int -> Int
+
+smallSizes :: Extents
+smallSizes = (+2)
 
 type ShapedExpr = ([Int], Expr0)
 translate :: Extents -> ContEq -> Expr0
 translate sizes expr = evalState (paraM alg expr) 0 where
     alg :: MRAlgebra ContEq (State Int) Expr0
     alg (_ ::< TensorF (unpack . tensorName -> name) ind) =
-        return $ vecView name $ map (sizes !) ind
+        return $ vecView name $ map sizes ind
     alg (free ::< SumF sumId (map (mapFst extract) -> ops)) = do
         -- Peel off a single dimension from all arguments, and compose the resulting map to the earlier ones
         let mapDim :: ([ShapedExpr], Expr0 -> Expr0) -> Int -> State Int ([ShapedExpr], Expr0 -> Expr0)
@@ -117,12 +127,12 @@ translate sizes expr = evalState (paraM alg expr) 0 where
                         | otherwise = do
                             nextId <- get
                             put $ nextId + 1
-                            let param = var ("a" ++ show nextId) (if null is then double else power double $ map (sizes !) is)
+                            let param = var ("a" ++ show nextId) (if null is then double else power double $ map sizes is)
                             return ((is, param):xs, (param,e):ys)
                 (xs', unzip -> (params, args)) <- foldrM (consumeDim i) ([],[]) xs 
                 return $ (xs', if null params then f else \e -> f $ mkZipWithN (lam params e) args)
         (ops',maps) <- foldM mapDim (ops,id) free 
         let (map snd -> scalars,map snd -> vec) = partition (null . fst) ops'
-            factors = scalars ++ if null vec then [scl $ fromIntegral $ sizes ! sumId] else [mkRnZ sclAdd (sclMulN $ length vec) vec]
+            factors = scalars ++ if null vec then [scl $ fromIntegral $ sizes sumId] else [mkRnZ sclAdd (sclMulN $ length vec) vec]
             red = case factors of [x] -> x; (x:xs) -> foldl (\expr arg -> mul expr arg) x xs
         return $ maps red

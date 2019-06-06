@@ -75,9 +75,9 @@ textToMaybe "" = Nothing
 textToMaybe t = Just t
 
 cpuCodeGen :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields, Callee ∈ fields, ClosureT ∈ fields, IsFreeVar ∈ fields, ParamSet ∈ fields, HofSpecId ∈ fields, OwnStorage ∈ fields) => 
-    String -> Expr fields -> HofSpec -> [Storage] -> (Text,Text)
+    Text -> Expr fields -> HofSpec -> [Storage] -> (Text,Text)
 cpuCodeGen evalName expr (HofSpec rnzSpec zipSpec) storage =
-    cpuEvaluatorTemplate closures storage (funs ++ hofs) retT (pack evalName) eval code where
+    cpuEvaluatorTemplate closures storage (funs ++ hofs) retT evalName eval code where
         closures = map (fmap toList) $ getClosureList $ fieldVal $ extract expr
         (CodeT code eval, funs) = runWriter (paraM cpuCodeGenAlg expr)
         hofs = concatMap rnzTemplate (assocs rnzSpec) ++ map zipTemplate (assocs zipSpec)

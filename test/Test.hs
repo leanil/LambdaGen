@@ -8,7 +8,7 @@ import Utility
 import Control.Comonad (extract)
 import Control.Monad (foldM, forM)
 import Data.Functor.Foldable (cata)
-import Data.Text (Text, concat, pack, unpack)
+import Data.Text (Text, concat, pack, stripEnd, unpack)
 import qualified Data.Text.IO as T (putStr, putStrLn, writeFile)
 import NeatInterpolation
 import Prelude hiding (concat)
@@ -23,8 +23,8 @@ contractionTestCount = 10
 contIds :: [Int]
 contIds = [1..contractionTestCount]
 
-evalIds :: [String]
-evalIds = (map (("evaluator"++) . show) [1..(length funcTests)])
+evalIds :: [Text]
+evalIds = map ((\n -> stripEnd [text|evaluator$n|]) . tshow) [1..(length funcTests)]
 
 createProcessAndExitOnFailure :: String -> [String] -> IO ()
 createProcessAndExitOnFailure processName args = do
@@ -49,11 +49,11 @@ main = do
     putStrLn "Random generated contractions:"
     forM contIds contractionTest
     T.writeFile ("test"</>"main"<.>"cpp") $ 
-        testCode (concat $ map (include "h". pack) evalIds ++ map ((\n -> include "hpp" [text|cont${n}test|]) . tshow) contIds)
-                 (concat $ zipWith3 evalCase (map tshow [1..]) (map pack evalIds) (map snd funcTests) ++
+        testCode (concat $ map (include "h") evalIds ++ map ((\n -> include "hpp" [text|cont${n}test|]) . tshow) contIds)
+                 (concat $ zipWith3 evalCase (map tshow [1..]) evalIds (map snd funcTests) ++
                            map (\n -> contCase (n+length funcTests) n) contIds)
     createProcessAndExitOnFailure "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
-    createProcessAndExitOnFailure "cmake" ["--build", ".", "--config", "Release"]
+    createProcessAndExitOnFailure "cmake" ["--build", ".", "--config", "Release", "--parallel"]
     createProcessAndExitOnFailure "ctest" []
 
 testCode :: Text -> Text -> Text
@@ -89,20 +89,19 @@ contCase :: Int -> Int -> Text
 contCase (tshow -> caseNum) (tshow -> n) = [text|case $caseNum: return !cont${n}test();|]
 
 contractionTest :: Int -> IO ()
-contractionTest num = do
-    expr <- sample
-    let sizes = makeSizes expr
-        test = translate sizes expr
+contractionTest (tshow -> num) = do
+    expr <- sampleSimple
+    let test = translate smallSizes expr
         path = "test" </> "contraction"
-        evalName = "cont" ++ show num
+        evalName = stripEnd [text|cont$num|]
         exprText = printContraction False expr
     compile path evalName test
-    let n = tshow num in T.putStr [text|$n) $exprText|]
-    T.writeFile (path </> (evalName ++ "test") <.> "hpp") $ 
-        contractionTestCode num exprText (initData sizes expr) (makeEvaluator sizes expr)
+    T.putStr [text|$num) $exprText|]
+    T.writeFile (path </> (unpack evalName ++ "test") <.> "hpp") $ 
+        contractionTestCode num exprText (initData smallSizes expr) (makeEvaluator smallSizes expr)
 
-contractionTestCode :: Int -> Text -> Text -> Text -> Text
-contractionTestCode (tshow -> num) exprText tensorMap evaluator =
+contractionTestCode :: Text -> Text -> Text -> Text -> Text
+contractionTestCode num exprText tensorMap evaluator =
     purge [text|
         //$exprText
         #include "cont$num.h"
