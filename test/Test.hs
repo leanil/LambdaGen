@@ -12,11 +12,8 @@ import Data.Text (Text, concat, pack, stripEnd, unpack)
 import qualified Data.Text.IO as T (putStr, putStrLn, writeFile)
 import NeatInterpolation
 import Prelude hiding (concat)
-import System.Directory (createDirectoryIfMissing, doesDirectoryExist, removeDirectoryRecursive)
-import System.Exit (ExitCode(..), exitFailure)
-import System.FilePath (FilePath, (</>),(<.>))
+import System.FilePath ((</>),(<.>))
 import System.IO (print)
-import System.Process (cwd, createProcess, proc, waitForProcess)
 
 contractionTestCount :: Int
 contractionTestCount = 10
@@ -25,20 +22,6 @@ contIds = [1..contractionTestCount]
 
 evalIds :: [Text]
 evalIds = map ((\n -> stripEnd [text|evaluator$n|]) . tshow) [1..(length funcTests)]
-
-createProcessAndExitOnFailure :: String -> [String] -> IO ()
-createProcessAndExitOnFailure processName args = do
-    (_, _, _, handle) <- createProcess (proc processName args){ cwd = Just "test/build" }
-    code <- waitForProcess handle
-    case code of
-        ExitSuccess -> return ()
-        _           -> exitFailure
-
-resetDir :: FilePath -> IO ()
-resetDir path = do
-    exist <- doesDirectoryExist path
-    if exist then removeDirectoryRecursive path else return ()
-    createDirectoryIfMissing True path
 
 main :: IO ()
 main = do
@@ -52,9 +35,10 @@ main = do
         testCode (concat $ map (include "h") evalIds ++ map ((\n -> include "hpp" [text|cont${n}test|]) . tshow) contIds)
                  (concat $ zipWith3 evalCase (map tshow [1..]) evalIds (map snd funcTests) ++
                            map (\n -> contCase (n+length funcTests) n) contIds)
-    createProcessAndExitOnFailure "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
-    createProcessAndExitOnFailure "cmake" ["--build", ".", "--config", "Release", "--parallel"]
-    createProcessAndExitOnFailure "ctest" []
+    let runProc = createProcessAndExitOnFailure $ "test" </> "build"
+    runProc "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
+    runProc "cmake" ["--build", ".", "--config", "Release", "--parallel"]
+    runProc "ctest" []
 
 testCode :: Text -> Text -> Text
 testCode includeText switchText = purge [text|

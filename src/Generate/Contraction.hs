@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, TemplateHaskell, TypeFamilies, ViewPatterns #-}
+{-# LANGUAGE FlexibleInstances, LambdaCase, OverloadedStrings, ScopedTypeVariables, TemplateHaskell, TypeFamilies, TypeSynonymInstances, ViewPatterns #-}
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 module Generate.Contraction where
@@ -14,8 +14,9 @@ import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
 import Control.Monad ((<=<), foldM)
 import Control.Monad.State (State, StateT, evalState, evalStateT, get, modify, put)
+import Data.Aeson (FromJSON(..), ToJSON(..), (.=), (.:), object, withObject)
 import Data.Foldable (foldrM)
-import Data.Functor.Foldable (Base, cata)
+import Data.Functor.Foldable (Base, ana, cata)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.List (foldl', partition)
 import Data.List.Ordered (has, member, minus, union)
@@ -40,6 +41,19 @@ leafCount = cata (\case TensorF{} -> 1; SumF _ ops -> sum ops)
 
 type ContEq = Cofree ContExprF [Int] -- A contraction equation, each subexpression annotated with its shape
 
+
+instance ToJSON ContEq where
+    toJSON = cata alg where
+        alg (shape ::< TensorF name indices) = object ["tag" .= ("Tensor"::String), "id" .= name, "indices" .= indices, "shape" .= shape]
+        alg (shape ::< SumF index ops) = object ["tag" .= ("Sum"::String), "index" .= index, "operands" .= ops, "shape" .= shape]
+instance FromJSON ContEq where
+    parseJSON = anaM alg where
+        alg = withObject "ContEq" $ \v -> do
+            tag <- v .: "tag"
+            (::<) <$> v .: "shape" <*> case tag of
+                ("Tensor"::String) -> TensorF <$> v .: "id" <*> v .: "indices"
+                "Sum" -> SumF <$> v .: "index" <*> v .: "operands"
+               
 calcDims :: ContExpr -> ContEq
 calcDims = cata alg where
     alg (node@(TensorF _ idxs)) = idxs :< node

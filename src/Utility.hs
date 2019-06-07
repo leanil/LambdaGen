@@ -3,6 +3,10 @@ module Utility where
 import Data.Char (chr, ord)
 import Data.List (sort, sortBy)
 import Data.Text (Text, filter, pack)
+import System.Directory (createDirectoryIfMissing, doesDirectoryExist, removeDirectoryRecursive)
+import System.Exit (ExitCode(..), exitFailure)
+import System.FilePath (FilePath)
+import System.Process (createProcess, cwd, proc, waitForProcess)
 
 tshow :: Show a => a -> Text
 tshow = pack . show
@@ -51,3 +55,17 @@ purge = Data.Text.filter (\c -> c /= '\r')
 iterateN :: Int -> (a->a) -> a -> [a]
 iterateN 0 _ _ = []
 iterateN n f x = x : iterateN (n-1) f (f x)
+
+createProcessAndExitOnFailure :: FilePath -> String -> [String] -> IO ()
+createProcessAndExitOnFailure workingDir processName args = do
+    (_, _, _, handle) <- createProcess (proc processName args){ cwd = Just workingDir }
+    code <- waitForProcess handle
+    case code of
+        ExitSuccess -> return ()
+        _           -> exitFailure
+
+resetDir :: FilePath -> IO ()
+resetDir path = do
+    exist <- doesDirectoryExist path
+    if exist then removeDirectoryRecursive path else return ()
+    createDirectoryIfMissing True path

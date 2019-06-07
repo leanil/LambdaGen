@@ -10,11 +10,18 @@ import Type
 import Utility
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
+import Data.Aeson (decode, encode)
 import Data.Functor.Foldable (cata, para)
 import Data.Map.Strict (Map, singleton, toList, unions)
+import Data.Maybe (fromJust)
 import Data.Text (Text, append, intercalate, stripEnd)
 import Data.Text as T (concat, cons)
+import Data.Text.IO as T (writeFile)
+import Data.Text.Lazy as T (lines, toStrict)
+import Data.Text.Lazy.Encoding (decodeUtf8, encodeUtf8)
+import Data.Text.Lazy.IO as T (readFile)
 import NeatInterpolation
+import System.FilePath (FilePath)
 
 printContraction :: Bool -> ContEq -> Text
 printContraction tex expr = math [text|R_$shape = $code|] where
@@ -80,3 +87,14 @@ for var (tshow -> range) body =
     for(int $var = 0; $var < $range; ++$var) {
         $body
     }|]
+
+saveContEqs :: FilePath -> [ContEq] -> IO ()
+saveContEqs path exprs = T.writeFile path $ T.concat $ json : "\n\n" : pretty where
+    json = T.toStrict $ decodeUtf8 $ encode exprs
+    pretty = map (printContraction False) exprs
+
+loadContEqs :: FilePath -> IO [ContEq]
+loadContEqs path = do
+    text <- T.readFile path
+    return $ fromJust $ decode $ encodeUtf8 $ head $ T.lines text
+    

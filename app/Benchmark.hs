@@ -28,20 +28,6 @@ contIds = [1..benchmarkCount]
 sizes :: [Int]
 sizes = iterateN 5 (*2) 8
 
-createProcessAndExitOnFailure :: String -> [String] -> IO ()
-createProcessAndExitOnFailure processName args = do
-    (_, _, _, handle) <- createProcess (proc  processName args){ cwd = Just "benchmark/build" }
-    code <- waitForProcess handle
-    case code of
-        ExitSuccess -> return ()
-        _           -> exitFailure
-
-resetDir :: FilePath -> IO ()
-resetDir path = do
-    exist <- doesDirectoryExist path
-    if exist then removeDirectoryRecursive path else return ()
-    createDirectoryIfMissing True path
-
 main :: IO ()
 main = do
     resetDir ("benchmark"</>"contraction")
@@ -49,8 +35,9 @@ main = do
     putStrLn "Benchmarked contractions:"
     (unzip3 -> (incs, funs, regs)) <- concat <$> mapM makeBenchmarks contIds
     T.writeFile ("benchmark"</>"main"<.>"cpp") $ testCode (T.concat incs) (T.concat funs) (T.concat regs)
-    createProcessAndExitOnFailure "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
-    createProcessAndExitOnFailure "cmake" ["--build", ".", "--config", "Release"]
+    let runProc = createProcessAndExitOnFailure $ "test" </> "benchmark"
+    runProc "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
+    runProc "cmake" ["--build", ".", "--config", "Release"]
 
 testCode :: Text -> Text -> Text -> Text
 testCode includes benchFuns regs = purge [text|
