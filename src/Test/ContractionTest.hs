@@ -11,7 +11,7 @@ t03 = calcDims $ Sum 1 [Tensor 0 [0]] -- B_i = c * A_i
 
 -- 1D:
 t11 = calcDims $ Sum 0 [Tensor 0 [0], Tensor 1 [0]] -- sum_i A_i * B_i					(dot)
-t12 = calcDims $ Sum 0 [Tensor 0 [0], Tensor 1 [0], Tensor 1 [0]] -- sum_i A_i * B_i * C_i					(expressivity check)
+t12 = calcDims $ Sum 0 [Tensor 0 [0], Tensor 1 [0], Tensor 2 [0]] -- sum_i A_i * B_i * C_i					(expressivity check)
 -- sum_i ( A_i + B_i ) * C_i				(fold-zip fusion check)
 -- sum_i ( A_i + B_i ) * (A_i  - C_i)
 -- sum_i ( A_i + B_i ) * (C_i  - D_i)			(2way fold zip fusion)
