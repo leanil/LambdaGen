@@ -9,20 +9,15 @@ import Test.FunctionalTest
 import Utility
 import Control.Applicative ((<$>))
 import Control.Comonad (extract)
-import Control.Monad ((>>=), foldM, forM)
-import Data.Functor.Foldable (cata)
-import Data.Text (Text, pack, stripEnd, unpack)
+import Control.Monad (forM, replicateM)
+import Data.Text (Text, pack, stripEnd)
 import qualified Data.Text as T (concat)
 import qualified Data.Text.IO as T (putStr, putStrLn, writeFile)
 import NeatInterpolation
-import System.Directory (createDirectoryIfMissing, doesDirectoryExist, removeDirectoryRecursive)
-import System.Exit (ExitCode(..), exitFailure)
-import System.FilePath (FilePath, (</>),(<.>))
-import System.IO (print)
-import System.Process (cwd, createProcess, proc, waitForProcess)
+import System.FilePath ((</>),(<.>))
 
 benchmarkCount :: Int
-benchmarkCount = 100
+benchmarkCount = 10
 contIds :: [Int]
 contIds = [1..benchmarkCount]
 sizes :: [Int]
@@ -32,10 +27,15 @@ main :: IO ()
 main = do
     resetDir ("benchmark"</>"contraction")
     resetDir ("benchmark"</>"build")
+    exprs <- replicateM benchmarkCount sampleSimple
+    --exprs <- loadContEqs ("experiment" </> "benchmark" <.> "json")
+    let numbered = zip (map tshow [1..]) exprs
     putStrLn "Benchmarked contractions:"
-    (unzip3 -> (incs, funs, regs)) <- concat <$> mapM makeBenchmarks contIds
+    forM numbered (\(n,printContraction False -> expr) -> T.putStr [text|$n) $expr|])
+    saveContEqs ("benchmark"</>"contraction"</>"expressions"<.>"json") exprs
+    (unzip3 -> (incs, funs, regs)) <- concat <$> mapM (uncurry makeBenchmarks) numbered
     T.writeFile ("benchmark"</>"main"<.>"cpp") $ testCode (T.concat incs) (T.concat funs) (T.concat regs)
-    let runProc = createProcessAndExitOnFailure $ "test" </> "benchmark"
+    let runProc = createProcessAndExitOnFailure $ "benchmark" </> "build"
     runProc "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
     runProc "cmake" ["--build", ".", "--config", "Release"]
 
@@ -59,11 +59,9 @@ include ext evalId = [text|#include "$evalId.$ext"|]
 contCase :: Int -> Int -> Text
 contCase (tshow -> caseNum) (tshow -> n) = [text|case $caseNum: return !cont${n}test();|]
 
-makeBenchmarks :: Int -> IO [(Text,Text,Text)]
-makeBenchmarks (tshow -> num) = do
-    expr <- sampleSimple
-    let exprText = printContraction False expr
-        makeBench size = do
+makeBenchmarks :: Text -> ContEq -> IO [(Text,Text,Text)]
+makeBenchmarks num expr = do
+    let makeBench size = do
             let test = translate (const size) expr
                 s = tshow size
                 inc = include "h" [text|cont${num}_$s|]
@@ -71,7 +69,6 @@ makeBenchmarks (tshow -> num) = do
                 register = [text|BENCHMARK(cont${num}_${s}_benchmark)->ComputeStatistics("min", min_time);|]
             compile ("benchmark" </> "contraction") (stripEnd [text|cont${num}_$s|]) test
             return (inc,benchFun,register)
-    T.putStr [text|$num) $exprText|]
     mapM makeBench sizes
         
 benchmarkFunction :: Text -> Text -> Text -> Text

@@ -97,4 +97,3 @@ loadContEqs :: FilePath -> IO [ContEq]
 loadContEqs path = do
     text <- T.readFile path
     return $ fromJust $ decode $ encodeUtf8 $ head $ T.lines text
-    
