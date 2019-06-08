@@ -4,9 +4,10 @@ import Compile
 import Generate.Contraction
 import Generate.ContractionText
 import Test.FunctionalTest
+import Test.ContractionTest
 import Utility
 import Control.Comonad (extract)
-import Control.Monad (foldM, forM)
+import Control.Monad (foldM, forM, replicateM)
 import Data.Functor.Foldable (cata)
 import Data.Text (Text, concat, pack, stripEnd, unpack)
 import qualified Data.Text.IO as T (putStr, putStrLn, writeFile)
@@ -15,10 +16,11 @@ import Prelude hiding (concat)
 import System.FilePath ((</>),(<.>))
 import System.IO (print)
 
-contractionTestCount :: Int
-contractionTestCount = 10
-contIds :: [Int]
-contIds = [1..contractionTestCount]
+getContractions :: IO [ContEq]
+getContractions = do
+    simple <- replicateM 10 sampleSimple
+    general <- replicateM 10 sample
+    return $ contTests ++ simple ++ general
 
 evalIds :: [Text]
 evalIds = map ((\n -> stripEnd [text|evaluator$n|]) . tshow) [1..(length funcTests)]
@@ -29,8 +31,10 @@ main = do
     resetDir ("test"</>"contraction")
     resetDir ("test"</>"build")
     foldM (\_ (evalId,(test,_)) -> (compile ("test"</>"kernel") evalId test)) Nothing (zip evalIds funcTests) -- TODO: can we fold these whithout a seed?
-    putStrLn "Random generated contractions:"
-    forM contIds contractionTest
+    putStrLn "Tested contractions:"
+    contractions <- getContractions
+    let contIds = [1..length contractions]
+    forM (zip contractions contIds) (uncurry contractionTest)
     T.writeFile ("test"</>"main"<.>"cpp") $ 
         testCode (concat $ map (include "h") evalIds ++ map ((\n -> include "hpp" [text|cont${n}test|]) . tshow) contIds)
                  (concat $ zipWith3 evalCase (map tshow [1..]) evalIds (map snd funcTests) ++
@@ -72,9 +76,8 @@ evalCase caseNum evalId expect = [text|case $caseNum: return !check($evalId(bigV
 contCase :: Int -> Int -> Text
 contCase (tshow -> caseNum) (tshow -> n) = [text|case $caseNum: return !cont${n}test();|]
 
-contractionTest :: Int -> IO ()
-contractionTest (tshow -> num) = do
-    expr <- sampleSimple
+contractionTest :: ContEq -> Int -> IO ()
+contractionTest expr (tshow -> num) = do
     let test = translate smallSizes expr
         path = "test" </> "contraction"
         evalName = stripEnd [text|cont$num|]
