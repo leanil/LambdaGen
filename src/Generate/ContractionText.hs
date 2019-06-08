@@ -24,14 +24,15 @@ import NeatInterpolation
 import System.FilePath (FilePath)
 
 printContraction :: Bool -> ContEq -> Text
-printContraction tex expr = math [text|R_$shape = $code|] where
+printContraction tex expr = math [text|R$shape = $code|] where
     (math,sub',sum) = case tex of
         True -> (\t -> [text|$$$t$$|], \t -> [text|{$t}|], "\\sum\\limits")
         False -> (id, id, "sum")
     shape = sub $ extract expr
     code = para rAlg expr
-    sub = sub' . T.concat . map indexName
-    rAlg (_ ::< TensorF (tensorName -> name) (sub -> idxs)) = [text|${name}_$idxs|]
+    sub xs = if null xs then "" else [text|_$idxs|] where
+        idxs = sub' $ T.concat $ map indexName xs
+    rAlg (_ ::< TensorF (tensorName -> name) (sub -> idxs)) = [text|${name}$idxs|]
     rAlg (_ ::< SumF (indexName -> name) ops) = stripEnd [text|${sum}_$name$ops'|] where
         ops' = T.concat $ map (stripEnd . T.cons ' ' . (\case (_ :< TensorF{},txt) -> txt; (_ :< SumF{},txt) -> [text|($txt)|])) ops
 
