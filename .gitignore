@@ -1,4 +1,9 @@
-test/build
+*/build
+test/contraction
+test/main.cpp
+benchmark/contraction
+benchmark/main.cpp
+experiment/
 
 .stack-work/
 LambdaGen.cabal

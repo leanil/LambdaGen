@@ -25,7 +25,7 @@ printerAlg :: forall fields select . (IndentT ∈ fields, select ⊆ fields, Rec
 
 printerAlg _ (r ::< Scalar x) = mkTabs r ++ "Scalar " ++ show x ++ ": " ++ show (rcast r :: R select) ++ "\n"
 
-printerAlg _ (r ::< View i _ _) = mkTabs r ++ "VectorView " ++ i ++ ": " ++ show (rcast r :: R select) ++ "\n"
+printerAlg _ (r ::< View i _) = mkTabs r ++ "VectorView " ++ i ++ ": " ++ show (rcast r :: R select) ++ "\n"
 
 printerAlg _ (r ::< ScalarOp op a b) = mkTabs r ++ "ScalarOp(" ++ op:") " ++ show (rcast r :: R select) ++ "\n" ++ a ++ b
 

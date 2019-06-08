@@ -19,8 +19,8 @@ template<typename _T1>
 void _lam4(_Cl4 _cl, double x3, double y3, _T1 _result);
 double _lam4(_Cl4 _cl, double x3, double y3);
 template<typename _T1>
-void _lam8(_Cl8 _cl, double x7, double y7, _T1 _result);
-double _lam8(_Cl8 _cl, double x7, double y7);
+void _lam8(_Cl8 _cl, double x17, double x27, _T1 _result);
+double _lam8(_Cl8 _cl, double x17, double x27);
 template<typename _T1, typename _T2>
 void _lam12(_Cl12 _cl, _T1 v211, _T2 _result);
 template<typename _T1>
@@ -43,13 +43,13 @@ double _lam4(_Cl4 _cl, double x3, double y3) {
     return result;
 }
 template<typename _T1>
-void _lam8(_Cl8 _cl, double x7, double y7, _T1 _result) {
-    _result = (x7) * (y7);
+void _lam8(_Cl8 _cl, double x17, double x27, _T1 _result) {
+    _result = (x17) * (x27);
     
 }
-double _lam8(_Cl8 _cl, double x7, double y7) {
+double _lam8(_Cl8 _cl, double x17, double x27) {
     double result;
-    _lam8(_cl, x7, y7, View<double*, double, to_list_t<>, true>(&result));
+    _lam8(_cl, x17, x27, View<double*, double, to_list_t<>, true>(&result));
     return result;
 }
 template<typename _T1, typename _T2>

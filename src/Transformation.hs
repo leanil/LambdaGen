@@ -8,6 +8,7 @@ import Replace
 import Type
 import Typecheck
 import Utility (intersectWithIndex, setByIndex, takeByIndex, dropByIndex, partitionByIndex)
+import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree ((:<)))
 import Data.Foldable (fold)
 import Data.Functor.Foldable (cata)
@@ -121,7 +122,7 @@ rnzSubdivTrans b = subdivBaseCase b ("r1","l","r2")
 subdivBaseCase :: TypecheckT ∈ fields => Int -> (String,String,String) -> Match fields -> Maybe (Match fields)
 subdivBaseCase b (o1,l,o2) match = Just $ foldl' (flip ($)) match updates where
     ms = mGetArgList match o1
-    ts = map (\(getType . fromJust . getAnnot -> FPower t ((_,s0):ds)) -> FPower t ((b,s0):ds)) ms
+    ts = map (\(getType . fromJust . extract -> FPower t ((_,s0):ds)) -> FPower t ((b,s0):ds)) ms
     us = zipWith (\i t -> ("u" ++ show i,t)) [1..] ts
     updates = [ insert (o1 ++ "__args") $ Args $ map (\x -> Nothing :< Subdiv 0 b x) ms,
                 insert l (Node Nothing $ Lambda us [] ()),
@@ -150,7 +151,7 @@ makeChanges matches v m x w =
     helper :: [(Int,Int)] -> ([(Int,(String,Type))],[(Int,ExprOpt fields)],[(Int,(String,Type))],[(Int,ExprOpt fields)])
     helper [] = ([],[],[],[])
     helper ((i,j):xs) = let (a,b,c,d) = helper xs
-                            (FPower t (d0:_:ds)) = getType $ fromJust $ getAnnot $ m !! i
+                            (FPower t (d0:_:ds)) = getType $ fromJust $ extract $ m !! i
                             v' = (fst (v !! i), power' t (d0:ds)) in
                         ((i,x !! j):a, (i,Nothing :< Variable (fst v') (snd v')):b, (j,v'):c, (j, Nothing :< Flip (0,1) (m !! i)):d)
 

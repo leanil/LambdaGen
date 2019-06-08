@@ -42,7 +42,7 @@ cpuCodeGenAlg (r ::< node) =
 
         Scalar x -> return $ scalarTemplate resultName x
 
-        View name dims strides -> return $ viewTemplate resultName "double*" "double" dims strides (pack name)
+        View name shape -> return $ viewTemplate resultName "double*" "double" shape (pack name)
 
         Variable name _ -> return $ variableTemplate (getLetId $ fieldVal r) resultName name (isFreeVar $ fieldVal r)
 
@@ -68,16 +68,16 @@ cpuCodeGenAlg (r ::< node) =
 
         LayoutOp op (_,code) ->
             return $ layoutOpTemplate eval resultName op shape code where
-                shape = case getType r of FPower _ s -> unzip s          
+                shape = case getType r of FPower _ s -> s          
 
 textToMaybe :: Text -> Maybe Text
 textToMaybe "" = Nothing
 textToMaybe t = Just t
 
 cpuCodeGen :: (TypecheckT ∈ fields, NodeId ∈ fields, LetId ∈ fields, Callee ∈ fields, ClosureT ∈ fields, IsFreeVar ∈ fields, ParamSet ∈ fields, HofSpecId ∈ fields, OwnStorage ∈ fields) => 
-    String -> Expr fields -> HofSpec -> [Storage] -> (Text,Text)
+    Text -> Expr fields -> HofSpec -> [Storage] -> (Text,Text)
 cpuCodeGen evalName expr (HofSpec rnzSpec zipSpec) storage =
-    cpuEvaluatorTemplate closures storage (funs ++ hofs) retT (pack evalName) eval code where
+    cpuEvaluatorTemplate closures storage (funs ++ hofs) retT evalName eval code where
         closures = map (fmap toList) $ getClosureList $ fieldVal $ extract expr
         (CodeT code eval, funs) = runWriter (paraM cpuCodeGenAlg expr)
         hofs = concatMap rnzTemplate (assocs rnzSpec) ++ map zipTemplate (assocs zipSpec)

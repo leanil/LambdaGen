@@ -24,11 +24,14 @@ dependencies:
 - base >= 4.7
 - comonad
 - containers
+- data-ordlist
 - deriving-compat
 - directory
 - either
 - filepath
 - free
+- hedgehog
+- mmorph
 - mtl
 - neat-interpolation
 - process
