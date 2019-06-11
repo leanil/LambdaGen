@@ -5,11 +5,12 @@ module Benchmark where
 import Compile
 import Generate.Contraction
 import Generate.ContractionText
+import Test.ContractionTest
 import Test.FunctionalTest
 import Utility
 import Control.Applicative ((<$>))
 import Control.Comonad (extract)
-import Control.Monad (forM, replicateM)
+import Control.Monad (forM, replicateM, void)
 import Data.Text (Text, pack, stripEnd)
 import qualified Data.Text as T (concat)
 import qualified Data.Text.IO as T (putStr, putStrLn, writeFile)
@@ -27,8 +28,9 @@ main :: IO ()
 main = do
     resetDir ("benchmark"</>"contraction")
     resetDir ("benchmark"</>"build")
-    exprs <- replicateM benchmarkCount sampleSimple
+    --exprs <- replicateM benchmarkCount sampleSimple
     --exprs <- loadContEqs ("experiment" </> "benchmark" <.> "json")
+    let exprs = contTests
     let numbered = zip (map tshow [1..]) exprs
     putStrLn "Benchmarked contractions:"
     forM numbered (\(n,printContraction False -> expr) -> T.putStr [text|$n) $expr|])
@@ -62,15 +64,18 @@ contCase (tshow -> caseNum) (tshow -> n) = [text|case $caseNum: return !cont${n}
 makeBenchmarks :: Text -> ContEq -> IO [(Text,Text,Text)]
 makeBenchmarks num expr = do
     let makeBench size = do
-            let test = translate (const size) expr
-                s = tshow size
+            let s = tshow size
                 inc = include "h" [text|cont${num}_$s|]
                 benchFun = benchmarkFunction num s $ initData (const size) expr
                 register = [text|BENCHMARK(cont${num}_${s}_benchmark)->ComputeStatistics("min", min_time);|]
-            compile ("benchmark" </> "contraction") (stripEnd [text|cont${num}_$s|]) test
+            benchmarkToLambdaGen ("benchmark" </> "contraction") (stripEnd [text|cont${num}_$s|]) (const size) expr
             return (inc,benchFun,register)
     mapM makeBench sizes
-        
+       
+benchmarkToLambdaGen :: FilePath -> Text -> Extents -> ContEq -> IO ()
+benchmarkToLambdaGen path kernelName sizes expr = 
+    void $ compile path kernelName $ translate sizes expr
+
 benchmarkFunction :: Text -> Text -> Text -> Text
 benchmarkFunction num size init = [text|
     void cont${num}_${size}_benchmark(benchmark::State& state) {

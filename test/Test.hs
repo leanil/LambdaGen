@@ -85,7 +85,7 @@ contractionTest expr (tshow -> num) = do
     compile path evalName test
     T.putStr [text|$num) $exprText|]
     T.writeFile (path </> (unpack evalName ++ "test") <.> "hpp") $ 
-        contractionTestCode num exprText (initData smallSizes expr) (makeEvaluator smallSizes expr)
+        contractionTestCode num exprText (initData smallSizes expr) (loopEvaluator smallSizes expr)
 
 contractionTestCode :: Text -> Text -> Text -> Text -> Text
 contractionTestCode num exprText tensorMap evaluator =

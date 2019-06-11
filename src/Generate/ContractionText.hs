@@ -14,14 +14,14 @@ import Data.Aeson (decode, encode)
 import Data.Functor.Foldable (cata, para)
 import Data.Map.Strict (Map, singleton, toList, unions)
 import Data.Maybe (fromJust)
-import Data.Text (Text, append, intercalate, stripEnd)
+import Data.Text (Text, append, intercalate, stripEnd, unpack)
 import Data.Text as T (concat, cons)
 import Data.Text.IO as T (writeFile)
 import Data.Text.Lazy as T (lines, toStrict)
 import Data.Text.Lazy.Encoding (decodeUtf8, encodeUtf8)
 import Data.Text.Lazy.IO as T (readFile)
 import NeatInterpolation
-import System.FilePath (FilePath)
+import System.FilePath (FilePath, (</>), (<.>))
 
 printContraction :: Bool -> ContEq -> Text
 printContraction tex expr = math [text|R$shape = $code|] where
@@ -60,8 +60,23 @@ initView input name dims = [text|$viewT $name$init;|] where
     viewT = cppType $ power double dims
     init = if input then [text|(userData.at("$name"))|] else ""
 
-makeEvaluator :: Extents -> ContEq -> Text -- Generate the for loops that calculate the contraction
-makeEvaluator sizes expr@(free :< SumF (indexName -> idx) _) = append (initViews sizes expr) loops where
+compileLoopEval :: FilePath -> Text -> Extents -> ContEq -> IO ()
+compileLoopEval path kernelName sizes expr = do
+    T.writeFile (path </> unpack kernelName <.> "h") header
+    T.writeFile (path </> unpack kernelName <.> "cpp") cpp where
+        header = purge $ cpuHeaderTemplate retT kernelName
+        cpp = purge [text|
+            #include "$kernelName.h"
+
+            $retT $kernelName(std::map<std::string, double*> const& userData) {
+                $evalCode
+                return R;
+            }|]
+        retT = cppType $ power double $ map sizes $ extract expr
+        evalCode = loopEvaluator sizes expr
+
+loopEvaluator :: Extents -> ContEq -> Text -- Generate the for loops that calculate the contraction
+loopEvaluator sizes expr@(free :< SumF (indexName -> idx) _) = append (initViews sizes expr) loops where
     loops = foldr (\x t -> for (indexName x) (sizes x) t) body free
     body = [text|
         $core
