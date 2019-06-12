@@ -86,6 +86,9 @@ struct ViewSize {
     using type = typename Foldr<Prod, Int<1>, L>::type;
 };
 
+template<typename V0, typename...>
+using size = Int<V0::size>;
+
 template<typename Ptr, typename T, typename D, typename Ds, bool IsRef>
 class View<Ptr, T, List<D, Ds>, IsRef> {
 public:

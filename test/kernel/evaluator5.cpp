@@ -16,7 +16,7 @@ struct _Cl12 {
 
 static const std::map<std::string, double*>* userData;
 View<double*, double, to_list_t<P<2,1>>> _t18;
-View<double*, double, to_list_t<P<3,2>, P<2,1>>> _t18_tmp;
+View<double*, double, to_list_t<P<2,1>>> _t18_tmp;
 
 template<typename _T1>
 void _lam3(_Cl3 _cl, double x3, double y3, _T1 _result);
@@ -68,11 +68,11 @@ void _lam15(_Cl15 _cl, double x16, _T1 v16, _T2 _result) {
 }
 template<typename _T1, typename _T2, typename... _T>
 void _rnz0(_Cl7 _clRed, _Cl15 _clZip, _T1 _result, _T2 _tmp, _T... vecs) {
-    for (int i = 0; i < _tmp.size; ++i)
-        _lam15(_clZip, vecs[i]..., _tmp[i]);
-    _result = _tmp[0];
-    for (int i = 1; i < _tmp.size; ++i)
-        _lam7(_clRed, _result, _tmp[i], _result);
+    _lam15(_clZip, vecs[0]..., _result);
+    for (int i = 1; i < size<_T...>(); ++i) {
+        _lam15(_clZip, vecs[i]..., _tmp);
+        _lam7(_clRed, _result, _tmp, _result);
+    }
 }
 template<typename _T1, typename... _T>
 void _zip0(_Cl3 _clZip, _T1 _result, _T... vecs) {

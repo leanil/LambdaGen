@@ -165,11 +165,11 @@ rnzTemplate ((redId, zipId), (ty, rnzIdToName -> hofName)) =
         template<typename _T1, typename _T2, typename... _T>
         void $hofName($clRed _clRed, $clZip _clZip, _T1 _result, _T2 _tmp, _T... vecs)|],
     [text|
-        for (int i = 0; i < _tmp.size; ++i)
-            $lamZip(_clZip, vecs[i]..., _tmp[i]);
-        _result = _tmp[0];
-        for (int i = 1; i < _tmp.size; ++i)
-            $lamRed(_clRed, _result, _tmp[i], _result);|]) : wrapper
+        $lamZip(_clZip, vecs[0]..., _result);
+        for (int i = 1; i < size<_T...>(); ++i) {
+            $lamZip(_clZip, vecs[i]..., _tmp);
+            $lamRed(_clRed, _result, _tmp, _result);
+        }|]) : wrapper
     where
         (clRed,lamRed) = lamIdToClosure &&& lamIdToName $ redId
         (clZip,lamZip) = lamIdToClosure &&& lamIdToName $ zipId

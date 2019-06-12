@@ -13,7 +13,7 @@ struct _Cl8 {
 
 static const std::map<std::string, double*>* userData;
 View<double*, double, to_list_t<P<2,1>>> _t14;
-View<double*, double, to_list_t<P<3,1>>> _t11_tmp;
+View<double*, double, to_list_t<>> _t11_tmp;
 
 template<typename _T1>
 void _lam4(_Cl4 _cl, double x3, double y3, _T1 _result);
@@ -66,11 +66,11 @@ double _lam12(_Cl12 _cl, _T1 v211) {
 }
 template<typename _T1, typename _T2, typename... _T>
 void _rnz0(_Cl4 _clRed, _Cl8 _clZip, _T1 _result, _T2 _tmp, _T... vecs) {
-    for (int i = 0; i < _tmp.size; ++i)
-        _lam8(_clZip, vecs[i]..., _tmp[i]);
-    _result = _tmp[0];
-    for (int i = 1; i < _tmp.size; ++i)
-        _lam4(_clRed, _result, _tmp[i], _result);
+    _lam8(_clZip, vecs[0]..., _result);
+    for (int i = 1; i < size<_T...>(); ++i) {
+        _lam8(_clZip, vecs[i]..., _tmp);
+        _lam4(_clRed, _result, _tmp, _result);
+    }
 }
 template<typename _T1, typename... _T>
 double _rnz0w(_Cl4 _clRed, _Cl8 _clZip, _T1 _tmp, _T... vecs) {
