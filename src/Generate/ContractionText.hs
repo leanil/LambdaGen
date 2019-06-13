@@ -10,7 +10,7 @@ import Type
 import Utility
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
-import Data.Aeson (decode, encode)
+import Data.Aeson (Value, (.=), decode, encode, object)
 import Data.Functor.Foldable (cata, para)
 import Data.Map.Strict (Map, singleton, toList, unions)
 import Data.Maybe (fromJust)
@@ -25,9 +25,9 @@ import System.FilePath (FilePath, (</>), (<.>))
 
 printContraction :: Bool -> ContEq -> Text
 printContraction tex expr = math [text|R$shape = $code|] where
-    (math,sub',sum) = case tex of
-        True -> (\t -> [text|$$$t$$|], \t -> [text|{$t}|], "\\sum\\limits")
-        False -> (id, id, "sum")
+    (math,sub',sum) = if tex
+        then (\t -> [text|$$$t$$|], \t -> [text|{$t}|], "\\sum\\limits")
+        else (id, id, "sum")
     shape = sub $ extract expr
     code = para rAlg expr
     sub xs = if null xs then "" else [text|_$idxs|] where
@@ -113,3 +113,11 @@ loadContEqs :: FilePath -> IO [ContEq]
 loadContEqs path = do
     text <- T.readFile path
     return $ fromJust $ decode $ encodeUtf8 $ head $ T.lines text
+
+saveContEqsWithExtents :: FilePath -> [(ContEq, Extents)] -> IO ()
+saveContEqsWithExtents path exprs = T.writeFile path $ T.toStrict $ decodeUtf8 $ encode $ map (uncurry contExtentToJson) exprs
+
+contExtentToJson :: ContEq -> Extents -> Value
+contExtentToJson expr sizes = cata alg expr where
+    alg (shape ::< TensorF name indices) = object ["tag" .= ("Tensor"::String), "id" .= name, "indices" .= indices, "shape" .= shape, "extents" .= map sizes shape]
+    alg (shape ::< SumF index ops) = object ["tag" .= ("Sum"::String), "index" .= index, "range" .= sizes index, "operands" .= ops, "shape" .= shape, "extents" .= map sizes shape]

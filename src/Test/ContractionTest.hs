@@ -29,8 +29,9 @@ t22 = calcDims $ Sum 1 [Tensor 0 [0,1], Tensor 1 [1], Tensor 2 [0]] -- t2_i = su
 t26 = calcDims $ Sum 1 [Tensor 0 [0], Tensor 1 [1], Tensor 2 [0], Tensor 3 [1]] -- t6_i = sum_j A_i * B_j * C_i * D_j			(outer product fusion / expressivity)
 t27 = calcDims $ Sum 1 [Tensor 0 [0,1], Sum 2 [Tensor 1 [1,2], Tensor 2 [2]]] -- t7_i = sum_j A_ij * (sum_k B_jk * C_k)		(double matrix - vector mul)
 -- t8_i = sum_j (A_ij + B_ij) (sum_k C_jk * D_k)	(double matrix - vector mul with zip fusion)
--- TODO t9_i = sum_j ( sum_k A_ik * B_kj) (C_j + D_j)	(mat - mat product with vector product fusion)
+-- t9_i = sum_j ( sum_k A_ik * B_kj) (C_j + D_j)	(mat - mat product with vector product fusion)
 t210 = calcDims $ Sum 1 [Sum 2 [Tensor 0 [0,2], Tensor 1 [1,2]], Sum 3 [Tensor 2 [1,3], Tensor 3 [3]]] -- B_kj transposed! t10_i = sum_j ( sum_k A_ik * B_kj) (sum_l C_jl * D_l) (all above)
+t211 = calcDims $ Sum 2 [Tensor 0 [0,2], Tensor 1 [1,2]] -- (mat - mat mul with transposed B)
 
 -- 3D:
 
@@ -46,4 +47,4 @@ t39 = calcDims $ Sum 2 [Tensor 0 [0,1,2], Sum 3 [Tensor 1 [2,3], Tensor 2 [3]]] 
 t310 = calcDims $ Sum 2 [Tensor 0 [0,1,2], Sum 3 [Tensor 1 [0,2,3], Tensor 2 [3]]] -- t10_ij = sum_k A_ijk * (sum_l B_ikl * C_l)    (double product fusion check, temporary should be better)
 t311 = calcDims $ Sum 2 [Tensor 0 [0], Tensor 1 [1], Tensor 2 [2], Sum 3 [Tensor 3 [0,2,3], Tensor 4 [3]]] -- t11_ij = sum_k (A_i * B_j * C_k) * (sum_l D_ikl * E_l)    (double product fusion check with outer product, temporary should be better)
 
-contTests = [t01, t03, t11, t12, t21, t22, t26, t27, t210, t31, t32, t33, t38, t39, t310, t311]
+contTests = [t01, t03, t11, t12, t21, t22, t26, t27, t210, t211, t31, t32, t33, t38, t39, t310, t311]

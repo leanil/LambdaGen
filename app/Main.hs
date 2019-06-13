@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, OverloadedStrings #-}
+{-# LANGUAGE DataKinds, OverloadedStrings, TupleSections #-}
 
 import Compile
 import Expr
@@ -32,5 +32,7 @@ main = do
     let exprs = contTests
     saveContEqs ("experiment" </> "contractions" <.> "json") exprs
     exprs' <- loadContEqs ("experiment" </> "contractions" <.> "json")
+    let sizes = const 10
+    saveContEqsWithExtents ("experiment" </> "contractions_with_sizes" <.> "json") $ map (,sizes) exprs
     T.putStrLn $ T.concat $ map (printContraction False) exprs'
-    forM_ (zip [1..] exprs') (\(num,expr) -> compile "experiment" (T.append "eval" $ tshow num) $ translate (const 10) expr)
+    forM_ (zip [1..] exprs') (\(num,expr) -> compile "experiment" (T.append "eval" $ tshow num) $ translate sizes expr)
