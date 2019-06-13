@@ -56,8 +56,8 @@ instance FromJSON ContEq where
                
 calcDims :: ContExpr -> ContEq
 calcDims = cata alg where
-    alg (node@(TensorF _ idxs)) = idxs :< node
-    alg (node@(SumF idx ops)) = dims :< node where
+    alg node@(TensorF _ idxs) = idxs :< node
+    alg node@(SumF idx ops) = dims :< node where
         dims = minus (foldl' union [] $ map extract ops) [idx]
 
 dimRange = Range.constant  1 4
@@ -75,7 +75,7 @@ genContExpr = do
     --                             True -> Just $ foldl' union [] ops
     --                             False -> Nothing
     --     noConstSum = isJust . (noConstResult <=< cataM alg)
-    Gen.filter (\a -> let x = leafCount a in x > 3 && x < 20) $ initGenExpr
+    Gen.filter (\a -> let x = leafCount a in x > 3 && x < 20) initGenExpr
 
 genExpr :: [Int] -> StateT GenState Gen ContExpr
 genExpr xs = Gen.recursive Gen.choice
@@ -108,15 +108,13 @@ subsequence :: MonadGen m => (Int,Int) -> [a] -> m [a]
 subsequence (minLength,maxLength) xs = Gen.filter (\case (length -> l) -> minLength <= l && l <= maxLength) (Gen.subsequence xs)
   
 sample :: IO ContEq
-sample = calcDims <$> (Gen.sample $ evalStateT genContExpr $ GenState 0 0)
+sample = calcDims <$> Gen.sample (evalStateT genContExpr $ GenState 0 0)
 
 sampleSimple :: IO ContEq
-sampleSimple = calcDims <$> (Gen.sample $ evalStateT genSimple 0)
+sampleSimple = calcDims <$> Gen.sample (evalStateT genSimple 0)
 
 randomContraction :: IO Expr0
-randomContraction = do
-    expr <- sample
-    return $ translate smallSizes expr
+randomContraction = translate smallSizes <$> sample
 
 type Extents = Int -> Int
 
@@ -136,7 +134,7 @@ translate sizes expr = evalState (paraM alg expr) 0 where
                 -- process a single argument, and replace it with a new variable if the outer dimension matches
                 let consumeDim :: Int -> ShapedExpr -> ([ShapedExpr], [(Expr0,Expr0)]) -> State Int ([ShapedExpr], [(Expr0,Expr0)])
                     consumeDim _ x@([],_) (xs,ys) = return (x:xs, ys)
-                    consumeDim i x@((i0:is), e) (xs,ys) 
+                    consumeDim i x@(i0:is, e) (xs,ys) 
                         | i0 /= i = return (x:xs,ys)
                         | otherwise = do
                             nextId <- get
@@ -144,9 +142,9 @@ translate sizes expr = evalState (paraM alg expr) 0 where
                             let param = var ("a" ++ show nextId) (if null is then double else power double $ map sizes is)
                             return ((is, param):xs, (param,e):ys)
                 (xs', unzip -> (params, args)) <- foldrM (consumeDim i) ([],[]) xs 
-                return $ (xs', if null params then f else \e -> f $ mkZipWithN (lam params e) args)
+                return (xs', if null params then f else \e -> f $ mkZipWithN (lam params e) args)
         (ops',maps) <- foldM mapDim (ops,id) free 
         let (map snd -> scalars,map snd -> vec) = partition (null . fst) ops'
             factors = scalars ++ if null vec then [scl $ fromIntegral $ sizes sumId] else [mkRnZ sclAdd (sclMulN $ length vec) vec]
-            red = case factors of [x] -> x; (x:xs) -> foldl (\expr arg -> mul expr arg) x xs
+            red = case factors of [x] -> x; (x:xs) -> foldl mul x xs
         return $ maps red

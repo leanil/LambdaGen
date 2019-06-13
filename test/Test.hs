@@ -7,7 +7,7 @@ import Test.FunctionalTest
 import Test.ContractionTest
 import Utility
 import Control.Comonad (extract)
-import Control.Monad (foldM, forM, replicateM)
+import Control.Monad (foldM_, forM_, replicateM)
 import Data.Functor.Foldable (cata)
 import Data.Text (Text, concat, pack, stripEnd, unpack)
 import qualified Data.Text.IO as T (putStr, putStrLn, writeFile)
@@ -30,11 +30,11 @@ main = do
     resetDir ("test"</>"kernel")
     resetDir ("test"</>"contraction")
     resetDir ("test"</>"build")
-    foldM (\_ (evalId,(test,_)) -> (compile ("test"</>"kernel") evalId test)) Nothing (zip evalIds funcTests) -- TODO: can we fold these whithout a seed?
+    foldM_ (\_ (evalId,(test,_)) -> compile ("test"</>"kernel") evalId test) Nothing (zip evalIds funcTests) -- TODO: can we fold these whithout a seed?
     putStrLn "Tested contractions:"
     contractions <- getContractions
     let contIds = [1..length contractions]
-    forM (zip contractions contIds) (uncurry contractionTest)
+    forM_ (zip contractions contIds) (uncurry contractionTest)
     T.writeFile ("test"</>"main"<.>"cpp") $ 
         testCode (concat $ map (include "h") evalIds ++ map ((\n -> include "hpp" [text|cont${n}test|]) . tshow) contIds)
                  (concat $ zipWith3 evalCase (map tshow [1..]) evalIds (map snd funcTests) ++

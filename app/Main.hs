@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, OverloadedStrings, QuasiQuotes, ViewPatterns #-}
+{-# LANGUAGE DataKinds, OverloadedStrings #-}
 
 import Compile
 import Expr
@@ -12,7 +12,7 @@ import Test.ContractionTest
 import Typecheck
 import Utility
 import Control.Comonad (extract)
-import Control.Monad (forM, replicateM, void)
+import Control.Monad (forM_, replicateM, void)
 import Data.Aeson (encode)
 import Data.Functor.Foldable (cata)
 import Data.List (intercalate)
@@ -33,4 +33,4 @@ main = do
     saveContEqs ("experiment" </> "contractions" <.> "json") exprs
     exprs' <- loadContEqs ("experiment" </> "contractions" <.> "json")
     T.putStrLn $ T.concat $ map (printContraction False) exprs'
-    void $ forM (zip [1..] exprs') (\(num,expr) -> compile "experiment" (T.append "eval" $ tshow num) $ translate (const 10) expr)
+    forM_ (zip [1..] exprs') (\(num,expr) -> compile "experiment" (T.append "eval" $ tshow num) $ translate (const 10) expr)
