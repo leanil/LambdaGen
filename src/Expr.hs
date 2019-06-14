@@ -5,7 +5,7 @@ module Expr where
 import Type
 import Control.Comonad.Cofree
 import Data.Eq.Deriving (deriveEq1)
-import Data.List
+import Data.List (sort)
 import Data.Vinyl
 import Text.Show.Deriving (deriveShow1)
 
@@ -95,7 +95,7 @@ lamBind v bind body = wrapExprF $ Lambda
     (map (\(FVariable _ i _, e) -> (i,e)) bind) body
 
 lam :: [Expr0] -> Expr0 -> Expr0
-lam v body = lamBind v [] body
+lam v = lamBind v []
 
 lam' :: [(String,Type)] -> [(String,Expr0)] -> Expr0 -> Expr0
 lam' v bind body = wrapExprF $ Lambda v bind body
@@ -128,7 +128,7 @@ flatten :: Int -> Expr0 -> Expr0
 flatten a b = wrapExprF $ Flatten a b
 
 isLeafNode :: ExprF a -> Bool
-isLeafNode (Scalar{}) = True
-isLeafNode (View{}) = True
-isLeafNode (Variable{}) = True
+isLeafNode Scalar{} = True
+isLeafNode View{} = True
+isLeafNode Variable{} = True
 isLeafNode _ = False

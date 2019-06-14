@@ -19,7 +19,7 @@ import Data.Foldable (foldrM)
 import Data.Functor.Foldable (Base, ana, cata)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.List (foldl', partition)
-import Data.List.Ordered (has, member, minus, union)
+import Data.List.Ordered (has, member, minus, sort, union)
 import Data.Maybe (isJust)
 import qualified Data.Set as Set (Set, fromList, insert, unions)
 import Data.Text (unpack)
@@ -56,7 +56,7 @@ instance FromJSON ContEq where
                
 calcDims :: ContExpr -> ContEq
 calcDims = cata alg where
-    alg node@(TensorF _ idxs) = idxs :< node
+    alg node@(TensorF _ idxs) = sort idxs :< node
     alg node@(SumF idx ops) = dims :< node where
         dims = minus (foldl' union [] $ map extract ops) [idx]
 
@@ -126,7 +126,7 @@ translate :: Extents -> ContEq -> Expr0
 translate sizes expr = evalState (paraM alg expr) 0 where
     alg :: MRAlgebra ContEq (State Int) Expr0
     alg (_ ::< TensorF (unpack . tensorName -> name) ind) =
-        return $ vecView name $ map sizes ind
+        return $ vecView' name $ map snd $ sort $ zip ind $ defaultStrides $ map sizes ind
     alg (free ::< SumF sumId (map (mapFst extract) -> ops)) = do
         -- Peel off a single dimension from all arguments, and compose the resulting map to the earlier ones
         let mapDim :: ([ShapedExpr], Expr0 -> Expr0) -> Int -> State Int ([ShapedExpr], Expr0 -> Expr0)
@@ -139,7 +139,11 @@ translate sizes expr = evalState (paraM alg expr) 0 where
                         | otherwise = do
                             nextId <- get
                             put $ nextId + 1
-                            let param = var ("a" ++ show nextId) (if null is then double else power double $ map sizes is)
+                            let param = var ("a" ++ show nextId) $ case (is,e) of 
+                                    ([],_) -> double
+                                    (_,_ :< View _ (_:shape)) -> power' double shape
+                                    (_,_ :< Variable _ (FPower _ (_:shape))) -> power' double shape
+                                    _ -> power double $ map sizes is
                             return ((is, param):xs, (param,e):ys)
                 (xs', unzip -> (params, args)) <- foldrM (consumeDim i) ([],[]) xs 
                 return (xs', if null params then f else \e -> f $ mkZipWithN (lam params e) args)

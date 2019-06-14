@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds, OverloadedStrings, TupleSections #-}
 
+import ClosureConversion
 import Compile
 import Expr
 import Generate.Contraction
@@ -27,12 +28,15 @@ test = fst rSubdiv
 
 main :: IO ()
 main = do
-    resetDir "experiment"
     --exprs <- replicateM 10 sampleSimple
     let exprs = contTests
     saveContEqs ("experiment" </> "contractions" <.> "json") exprs
     exprs' <- loadContEqs ("experiment" </> "contractions" <.> "json")
     let sizes = const 10
     saveContEqsWithExtents ("experiment" </> "contractions_with_sizes" <.> "json") $ map (,sizes) exprs
-    T.putStrLn $ T.concat $ map (printContraction False) exprs'
-    forM_ (zip [1..] exprs') (\(num,expr) -> compile "experiment" (T.append "eval" $ tshow num) $ translate sizes expr)
+    forM_ (zip [1..] exprs') (\(num,expr) -> do
+        T.putStrLn $ append "\n\n" $ printContraction False expr
+        result <- compile "experiment" (T.append "eval" $ tshow num) $ translate sizes expr
+        case result of
+            Just expr -> putStr $ printExpr (Proxy :: Proxy (R '[NodeId, TypecheckT, ClosureT])) expr
+            Nothing -> return ())

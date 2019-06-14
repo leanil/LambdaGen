@@ -6,5 +6,6 @@ benchmark/main.cpp
 experiment/
 
 .stack-work/
+stack.yaml.lock
 LambdaGen.cabal
 *~

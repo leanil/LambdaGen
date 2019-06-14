@@ -16,7 +16,7 @@ newtype IndentT = IndentT Int deriving Show
 indent :: Cofree ExprF (R fields) -> Cofree ExprF (R (IndentT ': fields))
 indent e = ana indentAlg (e,IndentT 0)
 
-indentAlg :: CoAlgebra (Cofree ExprF (R (IndentT ': fields))) ((Cofree ExprF (R fields)), IndentT)
+indentAlg :: CoAlgebra (Cofree ExprF (R (IndentT ': fields))) (Cofree ExprF (R fields), IndentT)
 indentAlg (r :< node, i) = (Identity i :& r) ::< fmap (,inc i) node where
     inc (IndentT ind) = IndentT $ ind+1
 
@@ -32,7 +32,7 @@ printerAlg _ (r ::< ScalarOp op a b) = mkTabs r ++ "ScalarOp(" ++ op:") " ++ sho
 printerAlg _ (r ::< Apply a b) = mkTabs r ++ "Apply: " ++ show (rcast r :: R select) ++ "\n" ++ a ++ concat b
 
 -- TODO: fix indentation of let names (and use templates overall)
-printerAlg _ (r ::< Lambda vs b a) = mkTabs r ++ "Lambda" ++ (concatMap ((' ':) . fst) vs) ++ ": " ++ show (rcast r :: R select) ++ "\n" ++
+printerAlg _ (r ::< Lambda vs b a) = mkTabs r ++ "Lambda" ++ concatMap ((' ':) . fst) vs ++ ": " ++ show (rcast r :: R select) ++ "\n" ++
                                     concatMap (\(n,v) -> n ++ " = " ++ v) b ++ a
 
 printerAlg _ (r ::< Variable i _) = mkTabs r ++ "Variable " ++ i ++ ": " ++ show (rcast r :: R select) ++ "\n"

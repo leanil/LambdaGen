@@ -10,7 +10,7 @@ import Test.FunctionalTest
 import Utility
 import Control.Applicative ((<$>))
 import Control.Comonad (extract)
-import Control.Monad (forM, replicateM, void)
+import Control.Monad (forM_, replicateM, void)
 import Data.Text (Text, pack, stripEnd)
 import qualified Data.Text as T (concat)
 import qualified Data.Text.IO as T (putStr, putStrLn, writeFile)
@@ -33,7 +33,7 @@ main = do
     let exprs = contTests
     let numbered = zip (map tshow [1..]) exprs
     putStrLn "Benchmarked contractions:"
-    forM numbered (\(n,printContraction False -> expr) -> T.putStr [text|$n) $expr|])
+    forM_ numbered (\(n,printContraction False -> expr) -> T.putStr [text|$n) $expr|])
     saveContEqs ("benchmark"</>"contraction"</>"expressions"<.>"json") exprs
     (unzip3 -> (incs, funs, regs)) <- concat <$> mapM (uncurry makeBenchmarks) numbered
     T.writeFile ("benchmark"</>"main"<.>"cpp") $ testCode (T.concat incs) (T.concat funs) (T.concat regs)

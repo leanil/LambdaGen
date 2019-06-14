@@ -5,7 +5,6 @@ module Type where
 import Recursion
 import Data.Functor.Classes (Eq1(..), Show1(..))
 import Data.Functor.Foldable (cata, Fix(..))
-import Data.List (intercalate)
 import GHC.Generics (Generic)
 
 data TypeF a
@@ -16,7 +15,7 @@ data TypeF a
 
 instance Eq1 TypeF where
     liftEq _ Double Double = True
-    liftEq eq (Power a b) (Power c d) = eq a c && (map fst b) == (map fst d)
+    liftEq eq (Power a b) (Power c d) = eq a c && map fst b == map fst d
     liftEq eq (Arrow a b) (Arrow c d) = and (zipWith eq a c) && eq b d
     liftEq _ _ _ = False
 
@@ -49,7 +48,7 @@ pattern FArrow a b = Fix (Arrow a b)
 typePrinterAlg :: Algebra Type String
 typePrinterAlg Double = "double"
 typePrinterAlg (Power a b) = "(" ++ a ++ ")^" ++ show b
-typePrinterAlg (Arrow a b) = "(" ++ intercalate " " a ++ ")->(" ++ b ++ ")"
+typePrinterAlg (Arrow a b) = "(" ++ unwords a ++ ")->(" ++ b ++ ")"
 
 showT :: Type -> String
 showT = cata typePrinterAlg
@@ -61,7 +60,7 @@ raiseToPower t a = power t [a]
 
 size :: Type -> Int
 size (FPower _ ((s,_):_)) = s
-size a = error $ "size on non-array type " ++ (showT a)
+size a = error $ "size on non-array type " ++ showT a
 
 defaultStrides :: [Int] -> [(Int,Int)]
 defaultStrides xs = zip xs $ tail $ scanr (*) 1 xs
