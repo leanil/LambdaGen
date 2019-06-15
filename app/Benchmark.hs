@@ -11,6 +11,7 @@ import Utility
 import Control.Applicative ((<$>))
 import Control.Comonad (extract)
 import Control.Monad (forM_, replicateM, void)
+import Control.Monad.State (StateT, evalStateT, lift, gets, modify)
 import Data.Text (Text, pack, stripEnd)
 import qualified Data.Text as T (concat)
 import qualified Data.Text.IO as T (putStr, putStrLn, writeFile)
@@ -22,7 +23,7 @@ benchmarkCount = 10
 contIds :: [Int]
 contIds = [1..benchmarkCount]
 sizes :: [Int]
-sizes = iterateN 5 (*2) 8
+sizes = iterateN 6 (*2) 8
 
 main :: IO ()
 main = do
@@ -30,12 +31,11 @@ main = do
     resetDir ("benchmark"</>"build")
     --exprs <- replicateM benchmarkCount sampleSimple
     --exprs <- loadContEqs ("experiment" </> "benchmark" <.> "json")
-    let exprs = contTests
-    let numbered = zip (map tshow [1..]) exprs
+    let exprs = [t211, t212]
     putStrLn "Benchmarked contractions:"
-    forM_ numbered (\(n,printContraction False -> expr) -> T.putStr [text|$n) $expr|])
-    saveContEqs ("benchmark"</>"contraction"</>"expressions"<.>"json") exprs
-    (unzip3 -> (incs, funs, regs)) <- concat <$> mapM (uncurry makeBenchmarks) numbered
+    --saveContEqs ("benchmark"</>"contraction"</>"expressions"<.>"json") exprs
+    let configs = [(i,j)|i<-[benchmarkToLambdaGen,compileLoopEval],j<-exprs]
+    (incs, funs, regs) <- evalStateT (unzip3 . concat <$> mapM (uncurry makeBenchmarks) configs) 0
     T.writeFile ("benchmark"</>"main"<.>"cpp") $ testCode (T.concat incs) (T.concat funs) (T.concat regs)
     let runProc = createProcessAndExitOnFailure $ "benchmark" </> "build"
     runProc "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
@@ -61,18 +61,24 @@ include ext evalId = [text|#include "$evalId.$ext"|]
 contCase :: Int -> Int -> Text
 contCase (tshow -> caseNum) (tshow -> n) = [text|case $caseNum: return !cont${n}test();|]
 
-makeBenchmarks :: Text -> ContEq -> IO [(Text,Text,Text)]
-makeBenchmarks num expr = do
-    let makeBench size = do
+type Compiler = FilePath -> Text -> Extents -> ContEq -> IO ()
+
+makeBenchmarks :: Compiler -> ContEq -> StateT Int IO [(Text,Text,Text)]
+makeBenchmarks compiler expr = do
+    num <- gets tshow
+    modify (+1)
+    let pretty = printContraction False expr
+        makeBench size = do
             let s = tshow size
                 inc = include "h" [text|cont${num}_$s|]
                 benchFun = benchmarkFunction num s $ initData (const size) expr
                 register = [text|BENCHMARK(cont${num}_${s}_benchmark)->ComputeStatistics("min", min_time);|]
-            benchmarkToLambdaGen ("benchmark" </> "contraction") (stripEnd [text|cont${num}_$s|]) (const size) expr
+            compiler ("benchmark" </> "contraction") (stripEnd [text|cont${num}_$s|]) (const size) expr
             return (inc,benchFun,register)
-    mapM makeBench sizes
+    lift $ T.putStr [text|$num) $pretty|]
+    lift $ mapM makeBench sizes
        
-benchmarkToLambdaGen :: FilePath -> Text -> Extents -> ContEq -> IO ()
+benchmarkToLambdaGen :: Compiler
 benchmarkToLambdaGen path kernelName sizes expr = 
     void $ compile path kernelName $ translate sizes expr
 
