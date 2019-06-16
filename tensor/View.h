@@ -6,8 +6,12 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <tuple>
 #include <type_traits>
 #include <utility>
+
+template<typename... T>
+using head = std::tuple_element_t<0, std::tuple<T...>>;
 
 template<int D, int S>
 struct P {

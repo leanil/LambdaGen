@@ -120,7 +120,7 @@ void _lam24(_Cl24 _cl, _T1 u24, _T2 _result) {
 template<typename _T1, typename _T2, typename... _T>
 void _rnz1(_Cl3 _clRed, _Cl15 _clZip, _T1 _result, _T2 _tmp, _T... vecs) {
     _lam15(_clZip, vecs[0]..., _result);
-    for (int i = 1; i < size<_T...>(); ++i) {
+    for (int i = 1; i < head<_T...>::size; ++i) {
         _lam15(_clZip, vecs[i]..., _tmp);
         _lam3(_clRed, _result, _tmp, _result);
     }
@@ -134,7 +134,7 @@ double _rnz1w(_Cl3 _clRed, _Cl15 _clZip, _T1 _tmp, _T... vecs) {
 template<typename _T1, typename _T2, typename... _T>
 void _rnz0(_Cl7 _clRed, _Cl11 _clZip, _T1 _result, _T2 _tmp, _T... vecs) {
     _lam11(_clZip, vecs[0]..., _result);
-    for (int i = 1; i < size<_T...>(); ++i) {
+    for (int i = 1; i < head<_T...>::size; ++i) {
         _lam11(_clZip, vecs[i]..., _tmp);
         _lam7(_clRed, _result, _tmp, _result);
     }

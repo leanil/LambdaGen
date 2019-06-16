@@ -45,7 +45,7 @@ double _lam7(_Cl7 _cl, double x17, double x27) {
 template<typename _T1, typename _T2, typename... _T>
 void _rnz0(_Cl3 _clRed, _Cl7 _clZip, _T1 _result, _T2 _tmp, _T... vecs) {
     _lam7(_clZip, vecs[0]..., _result);
-    for (int i = 1; i < size<_T...>(); ++i) {
+    for (int i = 1; i < head<_T...>::size; ++i) {
         _lam7(_clZip, vecs[i]..., _tmp);
         _lam3(_clRed, _result, _tmp, _result);
     }

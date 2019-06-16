@@ -73,7 +73,7 @@ appTemplate eval result (lamIdToName -> funName) closure args = case outParam of
             OutParam -> Just outParamName
             Tensor name -> Just name
             _ -> Nothing
-        code = strip $ [text|$funName($args')|]
+        code = strip [text|$funName($args')|]
         args' = intercalate ", " $ closure : args ++ maybeToList outParam
         
 -- | The Bool value tells if the variable is from the parameter set of the enclosing lambda (or inherited from it's closure).
@@ -95,12 +95,12 @@ paramTemplate (name,ty) = strip [text|$ty $name|]
 
 lambdaTemplate :: ExType -> Int -> [(String,Type)] -> Text -> Text -> [(Text,Text)]
 lambdaTemplate retT lamId (map (mapFst pack) -> params) eval body =
-    [([text|
+    ([text|
         $templateParams
         $retT' $name($params'')|],
     [text|
         $eval
-        $return|])] ++ wrapper
+        $return|]) : wrapper
     where
         templateParams = templateParamsTemplate templateCnt
         (retT',outParam,return) = case retT of
@@ -111,7 +111,7 @@ lambdaTemplate retT lamId (map (mapFst pack) -> params) eval body =
         params'' = intercalate ", " $ map paramTemplate $ closure ++ params'
         wrapper = case retT of
             Right FDouble -> [wrapperFunctionTemplate (templateCnt-1) name (closure ++ init params'::[(Text,Text)]) ]
-            otherwise     -> []
+            _             -> []
         (reverse -> params',templateCnt) = foldl' hideParams ([],0) $ params ++ outParam where
             hideParams (ps,cnt) (name,FDouble) = ((name,"double"):ps, cnt)
             hideParams (ps,cnt) (name,FPower{}) = ((name,templateArgName $ cnt+1):ps, cnt+1)
@@ -166,7 +166,7 @@ rnzTemplate ((redId, zipId), (ty, rnzIdToName -> hofName)) =
         void $hofName($clRed _clRed, $clZip _clZip, _T1 _result, _T2 _tmp, _T... vecs)|],
     [text|
         $lamZip(_clZip, vecs[0]..., _result);
-        for (int i = 1; i < size<_T...>(); ++i) {
+        for (int i = 1; i < head<_T...>::size; ++i) {
             $lamZip(_clZip, vecs[i]..., _tmp);
             $lamRed(_clRed, _result, _tmp, _result);
         }|]) : wrapper
