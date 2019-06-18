@@ -18,18 +18,15 @@ import qualified Data.Text.IO as T (putStr, putStrLn, writeFile)
 import NeatInterpolation
 import System.FilePath ((</>),(<.>))
 
-benchmarkCount :: Int
-benchmarkCount = 10
-contIds :: [Int]
-contIds = [1..benchmarkCount]
-sizes :: [Int]
+-- every expression will be benchmarked with each of these sizes
+sizes :: [Int] 
 sizes = iterateN 6 (*2) 8
 
 main :: IO ()
 main = do
     resetDir ("benchmark"</>"contraction")
     resetDir ("benchmark"</>"build")
-    --exprs <- replicateM benchmarkCount sampleSimple
+    --exprs <- replicateM benchmarkCount 10
     --exprs <- loadContEqs ("experiment" </> "benchmark" <.> "json")
     let exprs = [t211, t212]
     putStrLn "Benchmarked contractions:"
@@ -68,7 +65,7 @@ makeBenchmarks compiler expr = do
     num <- gets tshow
     modify (+1)
     let pretty = printContraction False expr
-        makeBench size = do
+        makeBench size = do -- instantiate the given expression with constant sized extents, i.e. all dimensions having the same size
             let s = tshow size
                 inc = include "h" [text|cont${num}_$s|]
                 benchFun = benchmarkFunction num s $ initData (const size) expr

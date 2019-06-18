@@ -164,18 +164,28 @@ rnzTemplate ((redId, zipId), (ty, rnzIdToName -> hofName)) =
     ([text|
         template<typename _T1, typename _T2, typename... _T>
         void $hofName($clRed _clRed, $clZip _clZip, _T1 _result, _T2 _tmp, _T... vecs)|],
-    [text|
-        $lamZip(_clZip, vecs[0]..., _result);
-        for (int i = 1; i < head<_T...>::size; ++i) {
-            $lamZip(_clZip, vecs[i]..., _tmp);
-            $lamRed(_clRed, _result, _tmp, _result);
-        }|]) : wrapper
+    body) : wrapper
     where
         (clRed,lamRed) = lamIdToClosure &&& lamIdToName $ redId
         (clZip,lamZip) = lamIdToClosure &&& lamIdToName $ zipId
         wrapper = case ty of
             FDouble -> [rnzWrapperTemplate clRed clZip hofName]
             _       -> []
+        body = case ty of
+            FDouble -> [text|
+                double tmp, result;
+                result = $lamZip(_clZip, vecs[0]...);
+                for (int i = 1; i < head<_T...>::size; ++i) {
+                    tmp = $lamZip(_clZip, vecs[i]...);
+                    result = $lamRed(_clRed, result, tmp);
+                }
+                _result = result;|]
+            _ -> [text|
+                $lamZip(_clZip, vecs[0]..., _result);
+                for (int i = 1; i < head<_T...>::size; ++i) {
+                    $lamZip(_clZip, vecs[i]..., _tmp);
+                    $lamRed(_clRed, _result, _tmp, _result);
+                }|]
 
 rnzWrapperTemplate :: Text -> Text -> Text -> (Text,Text)
 rnzWrapperTemplate clRed clZip hofName =

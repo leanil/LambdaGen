@@ -88,11 +88,13 @@ void _lam18(_Cl18 _cl, _T1 m119, _T2 m219, _T3 _result) {
 }
 template<typename _T1, typename _T2, typename... _T>
 void _rnz0(_Cl4 _clRed, _Cl8 _clZip, _T1 _result, _T2 _tmp, _T... vecs) {
-    _lam8(_clZip, vecs[0]..., _result);
+    double tmp, result;
+    result = _lam8(_clZip, vecs[0]...);
     for (int i = 1; i < head<_T...>::size; ++i) {
-        _lam8(_clZip, vecs[i]..., _tmp);
-        _lam4(_clRed, _result, _tmp, _result);
+        tmp = _lam8(_clZip, vecs[i]...);
+        result = _lam4(_clRed, result, tmp);
     }
+    _result = result;
 }
 template<typename _T1, typename... _T>
 double _rnz0w(_Cl4 _clRed, _Cl8 _clZip, _T1 _tmp, _T... vecs) {
