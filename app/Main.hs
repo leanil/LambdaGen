@@ -33,7 +33,7 @@ main = do
     saveContEqs ("experiment" </> "contractions" <.> "json") exprs
     exprs' <- loadContEqs ("experiment" </> "contractions" <.> "json")
     let sizes = const 10
-    saveContEqsWithExtents ("experiment" </> "contractions_with_sizes" <.> "json") $ map (,sizes) exprs
+    saveBenchmarks ("experiment" </> "contractions_with_sizes" <.> "json") $ map (,sizes) exprs
     forM_ (zip [1..] exprs') (\(num,expr) -> do
         T.putStrLn $ append "\n\n" $ printContraction False expr
         result <- compile "experiment" (T.append "eval" $ tshow num) $ translate sizes expr

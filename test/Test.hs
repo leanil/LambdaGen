@@ -18,8 +18,8 @@ import System.IO (print)
 
 getContractions :: IO [ContEq]
 getContractions = do
-    simple <- replicateM 10 sampleSimple
-    general <- replicateM 10 sample
+    simple <- replicateM 10 $ sample (GenConfig 1 4 1 4 1 6 1 2)
+    general <- replicateM 10 $ sample (GenConfig 1 4 1 5 1 20 1 5)
     return $ contTests ++ simple ++ general
 
 evalIds :: [Text]

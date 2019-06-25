@@ -2,8 +2,6 @@ module Test.ContractionTest where
 
 import Generate.Contraction
 
-t01, t03, t11, t12, t21, t22, t26, t27, t210, t211, t212, t31, t32, t33, t38, t39, t310, t311 :: ContEq
-
 -- Baseline:
 t01 = calcDims $ Sum 0 [Tensor 0 [0]] -- a = sum_i A_i
 -- B_i = A_i + 1
@@ -32,11 +30,18 @@ t27 = calcDims $ Sum 1 [Tensor 0 [0,1], Sum 2 [Tensor 1 [1,2], Tensor 2 [2]]] --
 -- t9_i = sum_j ( sum_k A_ik * B_kj) (C_j + D_j)	(mat - mat product with vector product fusion)
 t210 = calcDims $ Sum 1 [Sum 2 [Tensor 0 [0,2], Tensor 1 [2,1]], Sum 3 [Tensor 2 [1,3], Tensor 3 [3]]] -- t10_i = sum_j ( sum_k A_ik * B_kj) (sum_l C_jl * D_l) (all above)
 t211 = calcDims $ Sum 2 [Tensor 0 [0,2], Tensor 1 [2,1]] -- (mat - mat mul)
-t212 = calcDims $ Sum 2 [Tensor 0 [0,2], Tensor 1 [1,2]] -- (mat - mat mul with transposed B)
-
+t211a = calcDims $ Sum 2 [Tensor 0 [0,2], Tensor 1 [1,2]] -- (mat - mat mul with transposed B)
+t211b = calcDims $ Sum 2 [Tensor 0 [2,0], Tensor 1 [2,1]]
+t211c = calcDims $ Sum 2 [Tensor 0 [2,0], Tensor 1 [1,2]]
 -- 3D:
 
 t31 = calcDims $ Sum 3 [Tensor 0 [0,1,3], Tensor 1 [3,2]] -- t1_ijk = sum_l A_ijl * B_lk			(tensor- matrix mul)
+t31a = calcDims $ Sum 3 [Tensor 0 [0,1,3], Tensor 1 [2,3]]
+t31b = calcDims $ Sum 3 [Tensor 0 [0,3,1], Tensor 1 [3,2]]
+t31c = calcDims $ Sum 3 [Tensor 0 [0,3,1], Tensor 1 [2,3]]
+t31d = calcDims $ Sum 3 [Tensor 0 [3,0,1], Tensor 1 [3,2]]
+t31e = calcDims $ Sum 3 [Tensor 0 [3,0,1], Tensor 1 [2,3]]
+t31f = calcDims $ Sum 3 [Tensor 0 [3,1,0], Tensor 1 [2,3]]
 t32 = calcDims $ Sum 3 [Tensor 0 [0,1,3], Tensor 1 [3], Tensor 2 [2]] -- t2_ijk = sum_l (A_ijl) * (B_l * C_k)   		(outer product fusion check)
 t33 = calcDims $ Sum 3 [Tensor 0 [0,1,3], Tensor 1 [3,2], Tensor 2 [3], Tensor 3 [1]] -- t3_ijk = sum_l A_ijl * B_lk * C_l * D_j	(expressivity check)
 -- t4_ijk = sum_l (A_ijl + B_ijl) * C_lk 		(zip fusion check)
@@ -48,4 +53,4 @@ t39 = calcDims $ Sum 2 [Tensor 0 [0,1,2], Sum 3 [Tensor 1 [2,3], Tensor 2 [3]]] 
 t310 = calcDims $ Sum 2 [Tensor 0 [0,1,2], Sum 3 [Tensor 1 [0,2,3], Tensor 2 [3]]] -- t10_ij = sum_k A_ijk * (sum_l B_ikl * C_l)    (double product fusion check, temporary should be better)
 t311 = calcDims $ Sum 2 [Tensor 0 [0], Tensor 1 [1], Tensor 2 [2], Sum 3 [Tensor 3 [0,2,3], Tensor 4 [3]]] -- t11_ij = sum_k (A_i * B_j * C_k) * (sum_l D_ikl * E_l)    (double product fusion check with outer product, temporary should be better)
 
-contTests = [t01, t03, t11, t12, t21, t22, t26, t27, t210, t211, t212, t31, t32, t33, t38, t39, t310, t311]
+contTests = [t01, t03, t11, t12, t21, t22, t26, t27, t210, t211, t211a, t211b, t211c, t31, t31a, t31b, t31c, t31d, t31e, t31f, t32, t33, t38, t39, t310, t311]

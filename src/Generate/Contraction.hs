@@ -10,21 +10,22 @@ import Recursion
 import Type
 import Utility
 import Control.Applicative ((<$>))
+import Control.Arrow ((&&&))
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
-import Control.Monad ((<=<), foldM)
-import Control.Monad.State (State, StateT, evalState, evalStateT, get, modify, put)
+import Control.Monad ((<=<), foldM, replicateM)
+import Control.Monad.State (State, StateT, evalState, evalStateT, execState, get, modify, put)
 import Data.Aeson (FromJSON(..), ToJSON(..), (.=), (.:), object, withObject)
 import Data.Foldable (foldrM)
 import Data.Functor.Foldable (Base, ana, cata)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.List (foldl', partition)
 import Data.List.Ordered (has, member, minus, sort, union)
+import Data.Map.Strict as Map ((!), fromAscList)
 import Data.Maybe (isJust)
-import qualified Data.Set as Set (Set, fromList, insert, unions)
 import Data.Text (unpack)
 import Hedgehog (Gen, MonadGen)
-import qualified Hedgehog.Gen as Gen (choice, filter, int, list, recursive, sample, subsequence)
+import qualified Hedgehog.Gen as Gen (element, filter, frequency, int, list, sample, shuffle, subsequence)
 import qualified Hedgehog.Range as Range (constant)
 
 data ContExpr -- A contraction expression
@@ -36,11 +37,10 @@ makeBaseFunctor ''ContExpr
 
 expr = calcDims $ Sum 1 [Tensor 0 [0,1], Sum 2 [Tensor 1 [0,1,2], Tensor 2 [1,2]]]
 
-leafCount :: ContExpr -> Int
-leafCount = cata (\case TensorF{} -> 1; SumF _ ops -> sum ops)
+leafCount :: Algebra ContExpr Int
+leafCount = \case TensorF{} -> 1; SumF _ ops -> sum ops
 
 type ContEq = Cofree ContExprF [Int] -- A contraction equation, each subexpression annotated with its shape
-
 
 instance ToJSON ContEq where
     toJSON = cata alg where
@@ -63,58 +63,42 @@ calcDims = cata alg where
 dimRange = Range.constant  1 4
 numOps = Range.constant  1 4
 
-data GenState = GenState { tensorId :: Int, sumId :: Int }
+data GenConfig = GenConfig { minDims,maxDims, minOperands,maxOperands, minLeaves,maxLeaves, minSums,maxSums :: Int }
+data GenState = GenState { tensorId :: Int, sumId :: Int, resultDims :: Int }
 
-genContExpr :: StateT GenState Gen ContExpr
-genContExpr = do
-    resDims <- Gen.int $ Range.constant 0 2
-    let initGenExpr = do put $ GenState 0 resDims; genExpr [0..resDims-1]
+genContExpr :: GenConfig -> StateT GenState Gen ContExpr
+genContExpr config = do
+    resDims <- Gen.int $ Range.constant (minDims config) (maxDims config)
+    let initGenExpr = do put $ GenState 0 resDims resDims; genExpr config [0..resDims-1]
     --     noConstResult xs = if and $ map (has xs) [0..resDims-1] then Just () else Nothing
     --     alg (TensorF _ xs) = Just xs
     --     alg (SumF i ops) = case (and $ map (member i) ops) of
     --                             True -> Just $ foldl' union [] ops
     --                             False -> Nothing
     --     noConstSum = isJust . (noConstResult <=< cataM alg)
-    Gen.filter (\a -> let x = leafCount a in x > 3 && x < 20) initGenExpr
+    Gen.filter (\a -> let x = cata leafCount a in x > minLeaves config && x <= maxLeaves config) initGenExpr
 
-genExpr :: [Int] -> StateT GenState Gen ContExpr
-genExpr xs = Gen.recursive Gen.choice
-            [
-                do
-                    GenState nextId _ <- get
-                    subs <- subsequence (1,4) xs
-                    modify (\s -> s { tensorId = nextId + 1 })
-                    pure $ Tensor nextId subs
-            ] [
-                do
-                    GenState _ nextId <- get
-                    modify (\s -> s { sumId = nextId + 1 })
-                    ops <- Gen.list numOps (genExpr $ xs ++ [nextId])
-                    pure $ Sum nextId ops
-            ]
-
-genSimple :: StateT Int Gen ContExpr
-genSimple = do
-    resDims <- Gen.int $ Range.constant 0 2
-    let genLeaf = do
-            nextId <- get
-            subs <- subsequence (0,4) [0..resDims]
-            modify (+1)
-            pure $ Tensor nextId subs
-    ops <- Gen.list (Range.constant 1 4) genLeaf
-    pure $ Sum resDims ops
+genExpr :: GenConfig -> [Int] -> StateT GenState Gen ContExpr
+genExpr config xs = do
+    GenState nextTensor nextSum resDims <- get
+    let pSum = if nextSum - resDims < maxSums config then 1 else 0
+        genTensor = do
+            modify (\s -> s { tensorId = nextTensor + 1 })
+            subs <- subsequence (minDims &&& maxDims $ config) xs
+            pure $ Tensor nextTensor subs
+        genSum = do
+            modify (\s -> s { sumId = nextSum + 1 })
+            ops <- Gen.list (Range.constant (minOperands config) (maxOperands config)) (genExpr config $ xs ++ [nextSum])
+            pure $ Sum nextSum ops
+    Gen.frequency [(1,genTensor),(pSum,genSum)]
 
 subsequence :: MonadGen m => (Int,Int) -> [a] -> m [a]
-subsequence (minLength,maxLength) xs = Gen.filter (\case (length -> l) -> minLength <= l && l <= maxLength) (Gen.subsequence xs)
+subsequence (minLength,maxLength) xs 
+    | minLength <= min maxLength (length xs) = 
+        Gen.filter (\case (length -> l) -> minLength <= l && l <= maxLength) (Gen.subsequence xs) >>= Gen.shuffle -- TODO: generate well-sized subsets directly
   
-sample :: IO ContEq
-sample = calcDims <$> Gen.sample (evalStateT genContExpr $ GenState 0 0)
-
-sampleSimple :: IO ContEq
-sampleSimple = calcDims <$> Gen.sample (evalStateT genSimple 0)
-
-randomContraction :: IO Expr0
-randomContraction = translate smallSizes <$> sample
+sample :: GenConfig -> IO ContEq
+sample config = calcDims <$> Gen.sample (evalStateT (genContExpr config) (GenState 0 0 0))
 
 type Extents = Int -> Int
 
@@ -152,3 +136,17 @@ translate sizes expr = evalState (paraM alg expr) 0 where
             factors = scalars ++ if null vec then [scl $ fromIntegral $ sizes sumId] else [mkRnZ sclAdd (sclMulN $ length vec) vec]
             red = case factors of [x] -> x; (x:xs) -> foldl mul x xs
         return $ maps red
+
+totalSize :: Extents -> ContEq -> Int
+totalSize sizes = cata $ ignoreAlg (\case
+                        (TensorF _ idxs) -> product $ map sizes idxs
+                        (SumF _ ops) -> sum ops)
+
+collectIndices :: ContEq -> [Int]
+collectIndices = cata (ignoreAlg alg) where
+    alg (TensorF _ idxs) = sort idxs
+    alg (SumF i ops) = foldl' union [i] ops
+    
+genExtents :: [Int] -> Int -> ContEq -> IO Extents
+genExtents sizes maxSize expr = Gen.sample $ Gen.filter (\exts -> totalSize exts expr <= maxSize) $
+    (!) . Map.fromAscList <$> mapM (\ind -> do ext <- Gen.element sizes; pure (ind,ext)) (collectIndices expr)
