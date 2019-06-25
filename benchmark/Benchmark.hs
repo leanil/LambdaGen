@@ -19,14 +19,14 @@ import System.FilePath ((</>),(<.>))
 
 main :: IO ()
 main = do
-    resetDir ("benchmark"</>"contraction")
     resetDir ("benchmark"</>"build")
-    exprs <- replicateM 10 $ sample (GenConfig 1 4 1 4 1 6 2 2) -- See GenConfig def. in Contraction.hs
+    resetDir ("benchmark"</>"contraction")
+    exprs <- replicateM 1 $ sample (GenConfig 1 4 1 4 1 6 2 2) -- See GenConfig def. in Contraction.hs
     --exprs <- loadContEqs ("experiment" </> "benchmark" <.> "json")
     --let exprs = contTests
     let (possibleSizes, maxTotalElemCount) = ([2,4,5,7,8,32,48,50,64,100,250,512,1000,1024,1047], 200000)
     extents <- mapM (replicateM 5 . genExtents possibleSizes maxTotalElemCount) exprs
-    saveBenchmarks ("benchmark"</>"contraction"</>"expressions"<.>"json") $ concat $ zipWith (\expr exts -> map (expr,) exts) exprs extents
+    saveBenchmarks ("benchmark"</>"data"</>"expressions"<.>"json") $ concat $ zipWith (\expr exts -> map (expr,) exts) exprs extents
     -- let sizes = iterateN 5 (*2) 8 -- every expression will be benchmarked with each of these sizes
     -- saveBenchmarks ("benchmark"</>"contraction"</>"expressions"<.>"json") [(i,const j)|i<-exprs,j<-sizes]
     putStrLn "Benchmarked contractions:"
@@ -64,9 +64,9 @@ constSizedBenchmarks sizes = sizedBenchmarks $ map (const &&& tshow) sizes
 
 sizedBenchmarks :: [(Extents,Text)] -> Compiler -> ContEq -> StateT Int IO [(Text,Text,Text)]
 sizedBenchmarks sizes compiler expr = do
+    num <- gets tshow
     modify (+1)
     let pretty = printContraction False expr
-    num <- gets tshow
     lift $ T.putStr [text|$num) $pretty|]
     lift $ mapM (\(size,name) -> makeBenchmark compiler (stripEnd [text|cont${num}_$name|]) size expr) sizes
 
