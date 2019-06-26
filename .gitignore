@@ -3,7 +3,8 @@ test/contraction
 test/main.cpp
 benchmark/contraction
 benchmark/data/*.json
-benchmark/main.cpp
+benchmark/main*.cpp
+benchmark/add_executables.txt
 experiment/
 
 .stack-work/

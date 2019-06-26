@@ -114,14 +114,15 @@ loadContEqs path = do
     text <- T.readFile path
     return $ fromJust $ decode $ encodeUtf8 $ head $ T.lines text
 
-saveBenchmarks :: FilePath -> [(ContEq, Extents)] -> IO ()
-saveBenchmarks path exprs = T.writeFile path $ T.toStrict $ decodeUtf8 $ encode $ map (uncurry benchToJson) exprs
+saveBenchmarks :: FilePath -> [(ContEq, Extents, Text)] -> IO ()
+saveBenchmarks path exprs = T.writeFile path $ T.toStrict $ decodeUtf8 $ encode $ map (uncurry3 benchToJson) exprs
 
-benchToJson :: ContEq -> Extents -> Value
-benchToJson expr sizes = object ["count" .= cata (ignoreAlg leafCount) expr, 
-                                 "pretty" .= stripEnd (printContraction False expr),
-                                 "extents" .= toJSON (fromList $ map (\i -> (i,sizes i)) $ collectIndices expr),
-                                 "tree" .= treeToJson expr sizes]
+benchToJson :: ContEq -> Extents -> Text -> Value
+benchToJson expr sizes name = object ["name" .= name,
+                                      "pretty" .= stripEnd (printContraction False expr),
+                                      "extents" .= toJSON (fromList $ map (\i -> (i,sizes i)) $ collectIndices expr),
+                                      "count" .= cata (ignoreAlg leafCount) expr, 
+                                      "tree" .= treeToJson expr sizes]
 
 treeToJson :: ContEq -> Extents -> Value
 treeToJson expr sizes = cata alg expr where

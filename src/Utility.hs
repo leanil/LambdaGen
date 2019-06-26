@@ -71,3 +71,17 @@ resetDir path = do
     exist <- doesDirectoryExist path
     when exist $ removeDirectoryRecursive path
     createDirectoryIfMissing True path
+
+chunkList :: Int -> [a] -> [[a]]
+chunkList _ [] = []
+chunkList n xs = as : chunkList n bs where (as,bs) = splitAt n xs
+
+uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry3 f (a, b, c) = f a b c
+
+fstOf3   :: (a,b,c) -> a
+sndOf3   :: (a,b,c) -> b
+thdOf3   :: (a,b,c) -> c
+fstOf3      (a,_,_) =  a
+sndOf3      (_,b,_) =  b
+thdOf3      (_,_,c) =  c

@@ -5,32 +5,43 @@ project(LambdaGen_benchmark LANGUAGES CXX)
 set(GOOGLE_BENCH_LOC D:/Programs/google_bench/Release CACHE PATH "Google benchmark library (release build)")
 set(GOOGLE_BENCH_DEBUG_LOC D:/Programs/google_bench/Debug CACHE PATH "Google benchmark library (debug build)")
 
-FILE(GLOB CONTRACTIONS contraction/*)
+function(add_benchmark num)
 
-add_executable(bench main.cpp
-                     ../tensor/List.h
-                     ../tensor/View.h
-                     ../tensor/util.hpp
-                     ${CONTRACTIONS})
+    set(BENCH bench${num})
+    set(MAIN main${num}.cpp)
+    list(TRANSFORM ARGN PREPEND contraction/)
+    list(TRANSFORM ARGN APPEND .h OUTPUT_VARIABLE CONT_H)
+    list(TRANSFORM ARGN APPEND .cpp OUTPUT_VARIABLE CONT_CPP)
 
-target_include_directories(bench PRIVATE 
-                           ../tensor
-                           contraction
-                           ${GOOGLE_BENCH_LOC}/include)
-                        
-target_link_libraries(bench debug ${GOOGLE_BENCH_DEBUG_LOC}/lib/benchmark.lib)
-target_link_libraries(bench optimized ${GOOGLE_BENCH_LOC}/lib/benchmark.lib)
-target_link_libraries(bench shlwapi.lib)
+    add_executable(${BENCH} ${MAIN}
+                   ../tensor/List.h
+                   ../tensor/View.h
+                   ../tensor/util.hpp
+                   ${CONT_H}
+                   ${CONT_CPP})
 
-set_target_properties(bench PROPERTIES
-                      CXX_STANDARD 14
-                      CXX_STANDARD_REQUIRED ON)
+    target_include_directories(${BENCH} PRIVATE 
+                               ../tensor
+                               contraction
+                               ${GOOGLE_BENCH_LOC}/include)
+                            
+    target_link_libraries(${BENCH} debug ${GOOGLE_BENCH_DEBUG_LOC}/lib/benchmark.lib)
+    target_link_libraries(${BENCH} optimized ${GOOGLE_BENCH_LOC}/lib/benchmark.lib)
+    target_link_libraries(${BENCH} shlwapi.lib)
 
-if(MSVC)
-    set(RUN_BENCH ${CMAKE_BINARY_DIR}/Release/bench.exe)
-else()
-    set(RUN_BENCH ${CMAKE_BINARY_DIR}/bench)
-endif()
+    set_target_properties(${BENCH} PROPERTIES
+                          CXX_STANDARD 14
+                          CXX_STANDARD_REQUIRED ON)
+
+    set(OUT_JSON ${CMAKE_SOURCE_DIR}/data/times${num}.json)
+    set(TIME_FILES ${TIME_FILES} ${OUT_JSON} PARENT_SCOPE)
+    add_custom_command(OUTPUT ${OUT_JSON}
+                       COMMAND ${BENCH} --benchmark_repetitions=5 --benchmark_out=${OUT_JSON}
+                                        --benchmark_out_format=json --benchmark_report_aggregates_only=true
+                       COMMENT "Running benchmark ${num}")
+endfunction()
+
+include(add_executables.txt)
 
 if(WIN32)
     set(RUN_PYTHON py)
@@ -38,12 +49,7 @@ else()
     set(RUN_PYTHON python3)
 endif()
 
-message(${RUN_BENCH})
-
-add_custom_command(TARGET bench POST_BUILD
-                   COMMAND ${RUN_BENCH} --benchmark_repetitions=5 --benchmark_out=times.json
-                                        --benchmark_out_format=json --benchmark_report_aggregates_only=true
-                   COMMAND ${RUN_PYTHON} compose_data.py
-                   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/data
-                   COMMENT "Running benchmarks and composing data file...")
+add_custom_target(data ${RUN_PYTHON} compose_data.py ${TIME_FILES}
+                  DEPENDS ${TIME_FILES}
+                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/data)
                       
