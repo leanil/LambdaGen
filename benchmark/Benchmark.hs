@@ -19,12 +19,12 @@ main :: IO ()
 main = do
     let numExprs = 5
         numExtents = 5 -- number of different extent sets for each expression
-        config = GenConfig 1 4 1 4 1 6 1 1 -- minDims,maxDims, minOperands,maxOperands, minLeaves,maxLeaves, minSums,maxSums
-        (possibleSizes, maxTotalElemCount) = ([2,4,5,7,8,32,48,50,64,100,250,512,1000,1024,1047], 200000)
+        config = GenConfig 1 4 1 4 1 6 1 1 -- minDims,maxDims, minOperands,maxOperands, minTensors,maxTensors, minSums,maxSums
+        (possibleSizes, maxTotalElemCount) = ([2,4,5,7,8,32,48,50,64,100,250,512,1000,1024,1047], 1000000)
         nums = map tshow [0..]
-        chunk = chunkList 100
+        chunk = chunkList 50
     resetDir ("benchmark"</>"build")
-    resetDir ("benchmark"</>"contraction")
+    resetDir ("benchmark"</>"src")
     exprs <- replicateM numExprs $ sample config
     --exprs <- loadContEqs ("experiment" </> "benchmark" <.> "json")
     --let exprs = contTests
@@ -38,10 +38,11 @@ main = do
     codeParts <- map unzip . chunk <$> mapM (uncurry3 $ makeBenchmark benchmarkToLambdaGen) benchmarks
     let add_benchmark (T.unwords -> names) num = [text|add_benchmark($num $names)|]
     T.writeFile ("benchmark"</>"add_executables"<.>"txt") $ T.concat $ zipWith add_benchmark (chunk benchNames) nums
-    zipWithM_ (\(funs,regs) num -> T.writeFile ("benchmark"</>"main" ++ show num<.>"cpp") $ benchMainCode (map (include "h") benchNames) funs regs) codeParts [0..]
+    zipWithM_ (\(funs,regs) num -> T.writeFile ("benchmark"</>"src"</>"main" ++ show num<.>"cpp") $ benchMainCode (map (include "h") benchNames) funs regs) codeParts [0..]
     let runProc = createProcessAndExitOnFailure $ "benchmark" </> "build"
     runProc "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
-    runProc "cmake" ["--build", ".", "--config", "Release", "--target", "data"]
+    runProc "cmake" ["--build", ".", "--config", "Release", "--parallel"]
+    runProc "cmake" ["--build", ".", "--target", "data"]
 
 benchMainCode :: [Text] -> [Text] -> [Text] -> Text
 benchMainCode (T.concat -> includes) (T.concat -> benchFuns) (T.concat -> regs) =
@@ -75,7 +76,7 @@ makeBenchmark :: Compiler ->  ContEq -> Extents -> Text -> IO (Text,Text)
 makeBenchmark compiler expr sizes name = do
     let benchFun = benchmarkFunction name $ initData sizes expr
         register = [text|BENCHMARK(${name}_benchmark)->ComputeStatistics("min", min_time);|]
-    compiler ("benchmark" </> "contraction") name sizes expr
+    compiler ("benchmark" </> "src") name sizes expr
     return (benchFun,register)
        
 benchmarkToLambdaGen :: Compiler

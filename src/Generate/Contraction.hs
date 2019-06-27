@@ -37,8 +37,10 @@ makeBaseFunctor ''ContExpr
 
 expr = calcDims $ Sum 1 [Tensor 0 [0,1], Sum 2 [Tensor 1 [0,1,2], Tensor 2 [1,2]]]
 
-leafCount :: Algebra ContExpr Int
-leafCount = \case TensorF{} -> 1; SumF _ ops -> sum ops
+nodeCount :: Algebra ContExpr (Int,Int) -- (Sums,Tensors)
+nodeCount TensorF{} = (0,1)
+nodeCount (SumF _ ops) = (a+1,b) where
+    (a,b) = foldl' (\(p,q) (r,s) -> (p+r,q+s)) (0,0) ops
 
 type ContEq = Cofree ContExprF [Int] -- A contraction equation, each subexpression annotated with its shape
 
@@ -63,7 +65,7 @@ calcDims = cata alg where
 dimRange = Range.constant  1 4
 numOps = Range.constant  1 4
 
-data GenConfig = GenConfig { minDims,maxDims, minOperands,maxOperands, minLeaves,maxLeaves, minSums,maxSums :: Int }
+data GenConfig = GenConfig { minDims,maxDims, minOperands,maxOperands, minTens,maxTens, minSums,maxSums :: Int }
 data GenState = GenState { tensorId :: Int, sumId :: Int, resultDims :: Int }
 
 genContExpr :: GenConfig -> StateT GenState Gen ContExpr
@@ -76,7 +78,11 @@ genContExpr config = do
     --                             True -> Just $ foldl' union [] ops
     --                             False -> Nothing
     --     noConstSum = isJust . (noConstResult <=< cataM alg)
-    Gen.filter (\a -> let x = cata leafCount a in x > minLeaves config && x <= maxLeaves config) initGenExpr
+    let check expr = countsOk && resultDimsOk where
+            countsOk = s >= minSums config && s <= maxSums config && t >= minTens config && t <= maxTens config
+            resultDimsOk = extract (calcDims expr) == [0..resDims-1]
+            (s,t) = cata nodeCount expr
+    Gen.filter check initGenExpr
 
 genExpr :: GenConfig -> [Int] -> StateT GenState Gen ContExpr
 genExpr config xs = do
@@ -138,9 +144,8 @@ translate sizes expr = evalState (paraM alg expr) 0 where
         return $ maps red
 
 totalSize :: Extents -> ContEq -> Int
-totalSize sizes = cata $ ignoreAlg (\case
-                        (TensorF _ idxs) -> product $ map sizes idxs
-                        (SumF _ ops) -> sum ops)
+totalSize sizes = cata (\case (_ ::< TensorF _ idxs) -> product $ map sizes idxs
+                              (shape ::< SumF _ ops) -> sum ops + product (map sizes shape))
 
 collectIndices :: ContEq -> [Int]
 collectIndices = cata (ignoreAlg alg) where

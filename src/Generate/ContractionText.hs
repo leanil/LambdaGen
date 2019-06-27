@@ -121,7 +121,7 @@ benchToJson :: ContEq -> Extents -> Text -> Value
 benchToJson expr sizes name = object ["name" .= name,
                                       "pretty" .= stripEnd (printContraction False expr),
                                       "extents" .= toJSON (fromList $ map (\i -> (i,sizes i)) $ collectIndices expr),
-                                      "count" .= cata (ignoreAlg leafCount) expr, 
+                                      "count" .= snd (cata (ignoreAlg nodeCount) expr), 
                                       "tree" .= treeToJson expr sizes]
 
 treeToJson :: ContEq -> Extents -> Value
