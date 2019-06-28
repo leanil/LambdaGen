@@ -7,7 +7,7 @@ maintainer:          "leanil94@gmail.com"
 copyright:           "2018 András Leitereg"
 
 extra-source-files:
-- README.md
+- readme.md
 - ChangeLog.md
 
 # Metadata used when publishing your package
@@ -61,6 +61,17 @@ tests:
   LambdaGen-test:
     main:                Test.hs
     source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - LambdaGen
+
+benchmarks:
+  LambdaGen-bench:
+    main: Benchmark.hs
+    source-dirs: benchmark
     ghc-options:
     - -threaded
     - -rtsopts

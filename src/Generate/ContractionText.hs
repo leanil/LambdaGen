@@ -10,9 +10,9 @@ import Type
 import Utility
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
-import Data.Aeson (Value, (.=), decode, encode, object)
+import Data.Aeson (Value, (.=), decode, encode, object, toJSON)
 import Data.Functor.Foldable (cata, para)
-import Data.Map.Strict (Map, singleton, toList, unions)
+import Data.Map.Strict (Map, fromList, singleton, toList, unions)
 import Data.Maybe (fromJust)
 import Data.Text (Text, append, intercalate, stripEnd, unpack)
 import Data.Text as T (concat, cons)
@@ -114,10 +114,17 @@ loadContEqs path = do
     text <- T.readFile path
     return $ fromJust $ decode $ encodeUtf8 $ head $ T.lines text
 
-saveContEqsWithExtents :: FilePath -> [(ContEq, Extents)] -> IO ()
-saveContEqsWithExtents path exprs = T.writeFile path $ T.toStrict $ decodeUtf8 $ encode $ map (uncurry contExtentToJson) exprs
+saveBenchmarks :: FilePath -> [(ContEq, Extents, Text)] -> IO ()
+saveBenchmarks path exprs = T.writeFile path $ T.toStrict $ decodeUtf8 $ encode $ map (uncurry3 benchToJson) exprs
 
-contExtentToJson :: ContEq -> Extents -> Value
-contExtentToJson expr sizes = cata alg expr where
-    alg (shape ::< TensorF name indices) = object ["tag" .= ("Tensor"::String), "id" .= name, "indices" .= indices, "shape" .= shape, "extents" .= map sizes shape]
-    alg (shape ::< SumF index ops) = object ["tag" .= ("Sum"::String), "index" .= index, "range" .= sizes index, "operands" .= ops, "shape" .= shape, "extents" .= map sizes shape]
+benchToJson :: ContEq -> Extents -> Text -> Value
+benchToJson expr sizes name = object ["name" .= name,
+                                      "pretty" .= stripEnd (printContraction False expr),
+                                      "extents" .= toJSON (fromList $ map (\i -> (i,sizes i)) $ collectIndices expr),
+                                      "count" .= snd (cata (ignoreAlg nodeCount) expr), 
+                                      "tree" .= treeToJson expr sizes]
+
+treeToJson :: ContEq -> Extents -> Value
+treeToJson expr sizes = cata alg expr where
+    alg (shape ::< TensorF name indices) = object ["tag" .= ("Tensor"::String), "id" .= name, "indices" .= indices]
+    alg (shape ::< SumF index ops) = object ["tag" .= ("Sum"::String), "index" .= index, "range" .= sizes index, "operands" .= ops]

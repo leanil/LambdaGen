@@ -1,8 +1,9 @@
 */build
 test/contraction
 test/main.cpp
-benchmark/contraction
-benchmark/main.cpp
+benchmark/src
+benchmark/data/*.json
+benchmark/add_executables.txt
 experiment/
 
 .stack-work/

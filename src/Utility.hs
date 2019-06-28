@@ -1,5 +1,7 @@
 module Utility where
 
+import Control.Applicative ((<$>))
+import Control.Monad (when)
 import Data.Char (chr, ord)
 import Data.List (sort, sortBy)
 import Data.Text (Text, filter, pack)
@@ -23,7 +25,7 @@ partitionByIndex = helper 0 where
     helper _ _ [] = ([],[])
     helper i (j:js) (a:as)
          | i == j = mapFst (a:) $ helper (i+1) js as
-         | otherwise = fmap (a:) $ helper (i+1) (j:js) as
+         | otherwise = (a:) <$> helper (i+1) (j:js) as
 
 takeByIndex :: [Int] -> [a] -> [a]
 takeByIndex i a = fst $ partitionByIndex i a
@@ -50,7 +52,7 @@ charShift :: Char -> Int -> Char
 charShift c n = chr $ ord c + n
 
 purge :: Text -> Text
-purge = Data.Text.filter (\c -> c /= '\r')
+purge = Data.Text.filter (/= '\r')
 
 iterateN :: Int -> (a->a) -> a -> [a]
 iterateN 0 _ _ = []
@@ -67,5 +69,19 @@ createProcessAndExitOnFailure workingDir processName args = do
 resetDir :: FilePath -> IO ()
 resetDir path = do
     exist <- doesDirectoryExist path
-    if exist then removeDirectoryRecursive path else return ()
+    when exist $ removeDirectoryRecursive path
     createDirectoryIfMissing True path
+
+chunkList :: Int -> [a] -> [[a]]
+chunkList _ [] = []
+chunkList n xs = as : chunkList n bs where (as,bs) = splitAt n xs
+
+uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry3 f (a, b, c) = f a b c
+
+fstOf3   :: (a,b,c) -> a
+sndOf3   :: (a,b,c) -> b
+thdOf3   :: (a,b,c) -> c
+fstOf3      (a,_,_) =  a
+sndOf3      (_,b,_) =  b
+thdOf3      (_,_,c) =  c

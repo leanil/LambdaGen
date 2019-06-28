@@ -2,6 +2,7 @@
 
 module Recursion where
 
+import Control.Applicative ((<$>))
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree ((:<)))
 import qualified Control.Comonad.Trans.Cofree as CofreeT (CofreeF ((:<)))
@@ -48,17 +49,20 @@ annotateAna alg a@(old :< _,_) = appendFields old $ alg a
 annotateAnaM :: (Functor f, Monad m) =>
                MCoAlgebra (Cofree f new) m (Cofree f (R old), seed) -> 
                MCoAlgebra (Cofree f (R (new ': old))) m (Cofree f (R old), seed)
-annotateAnaM alg a@(old :< _,_) = fmap (appendFields old) $ alg a
+annotateAnaM alg a@(old :< _,_) = appendFields old <$> alg a
 
 annotateAnaM2 :: (Functor f, Monad m) =>
                (new -> boxed) ->
                MCoAlgebra (Cofree f new) m (Cofree f (R old), seed) -> 
                MCoAlgebra (Cofree f (R (boxed ': old))) m (Cofree f (R old), seed)
-annotateAnaM2 box alg a@(old :< _,_) = fmap (appendFields2 box old) $ alg a
+annotateAnaM2 box alg a@(old :< _,_) = appendFields2 box old <$> alg a
 
 --ignoreAlg :: Algebra t a -> Algebra (Cofree (Base t) b) a
 ignoreAlg :: (f a -> a) -> (CofreeF f b a -> a)
 ignoreAlg alg (_ ::< expr) = alg expr
+
+ignoreAlgM :: (f a -> m a) -> (CofreeF f b a -> m a)
+ignoreAlgM alg (_ ::< expr) = alg expr
 
 appendFields :: R old -> CofreeF f new b -> CofreeF f (R (new : old)) b
 appendFields old (new ::< node) = (Identity new :& old) ::< node

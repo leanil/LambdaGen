@@ -116,7 +116,7 @@ void _lam30(_Cl30 _cl, _T1 m31, _T2 _result) {
 template<typename _T1, typename _T2, typename... _T>
 void _rnz0(_Cl11 _clRed, _Cl26 _clZip, _T1 _result, _T2 _tmp, _T... vecs) {
     _lam26(_clZip, vecs[0]..., _result);
-    for (int i = 1; i < size<_T...>(); ++i) {
+    for (int i = 1; i < head<_T...>::size; ++i) {
         _lam26(_clZip, vecs[i]..., _tmp);
         _lam11(_clRed, _result, _tmp, _result);
     }
