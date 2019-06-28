@@ -1,12 +1,14 @@
 cmake_minimum_required(VERSION 3.12)
 
 project(LambdaGen_benchmark LANGUAGES CXX)
-
-set(GOOGLE_BENCH_LOC D:/Programs/google_bench/Release CACHE PATH "Google benchmark library (release build)")
-set(GOOGLE_BENCH_DEBUG_LOC D:/Programs/google_bench/Debug CACHE PATH "Google benchmark library (debug build)")
     
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+get_filename_component(GOOGLE_BENCH_DIR ../dependencies/google_benchmark ABSOLUTE)
+option(BENCHMARK_ENABLE_GTEST_TESTS "Enable building the unit tests which depend on gtest" OFF)
+add_subdirectory(${GOOGLE_BENCH_DIR}/src ${GOOGLE_BENCH_DIR}/build)
 
 function(add_benchmark num)
 
@@ -24,14 +26,12 @@ function(add_benchmark num)
                    ${CONT_H}
                    ${CONT_CPP})
 
-    target_include_directories(${BENCH} PRIVATE 
-                               ../tensor
-                               src
-                               ${GOOGLE_BENCH_LOC}/include)
+    target_include_directories(${BENCH} PRIVATE ../tensor)
                             
-    target_link_libraries(${BENCH} debug ${GOOGLE_BENCH_DEBUG_LOC}/lib/benchmark.lib)
-    target_link_libraries(${BENCH} optimized ${GOOGLE_BENCH_LOC}/lib/libbenchmark.a Threads::Threads)
-    target_link_libraries(${BENCH} shlwapi.lib)
+    target_link_libraries(${BENCH} benchmark Threads::Threads)
+    if(WIN32)
+        target_link_libraries(${BENCH} shlwapi.lib)
+    endif()
     
     set_target_properties(${BENCH} PROPERTIES
                           CXX_STANDARD 14
@@ -48,13 +48,7 @@ endfunction()
 
 include(add_executables.txt)
 
-if(WIN32)
-    set(RUN_PYTHON py)
-else()
-    set(RUN_PYTHON python3)
-endif()
-
-add_custom_target(data ${RUN_PYTHON} compose_data.py ${TIME_FILES}
+add_custom_target(data ${Python3_EXECUTABLE} compose_data.py ${TIME_FILES}
                   DEPENDS ${TIME_FILES}
                   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/data)
                       

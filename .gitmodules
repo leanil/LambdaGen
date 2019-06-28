@@ -1,0 +1,3 @@
+[submodule "dependencies/google_benchmark/src"]
+	path = dependencies/google_benchmark/src
+	url = https://github.com/google/benchmark.git

@@ -34,7 +34,7 @@ for time_filename in sys.argv[1:]:
 if len(exprs) != len(times):
     raise AssertionError("measurement count mismatch: " + str(len(exprs)) + " != " + str(len(times)))
 data = map(merge_json, exprs, times, itertools.count())
-time_stamp = datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d_%H:%M:%S')
+time_stamp = datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d_%H-%M-%S')
 data_filename = "data_" + time_stamp + ".json"
 with open(data_filename, 'w') as data_file:
     data_file.write('{\n"data" :\n[\n')

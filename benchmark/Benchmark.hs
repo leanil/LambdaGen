@@ -42,7 +42,7 @@ main = do
     let runProc = createProcessAndExitOnFailure $ "benchmark" </> "build"
     runProc "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
     runProc "cmake" ["--build", ".", "--config", "Release", "--parallel"]
-    runProc "cmake" ["--build", ".", "--target", "data"]
+    runProc "cmake" ["--build", ".", "--config", "Release", "--target", "data"]
 
 benchMainCode :: [Text] -> [Text] -> [Text] -> Text
 benchMainCode (T.concat -> includes) (T.concat -> benchFuns) (T.concat -> regs) =

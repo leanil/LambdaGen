@@ -1,4 +1,4 @@
-*/build
+build/
 test/contraction
 test/main.cpp
 benchmark/src
