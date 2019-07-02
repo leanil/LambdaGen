@@ -25,17 +25,18 @@ main = do
         chunk = chunkList 50
     resetDir ("benchmark"</>"build")
     resetDir ("benchmark"</>"src")
-    exprs <- replicateM numExprs $ sample config
+    --exprs <- replicateM numExprs $ sample config
     --exprs <- loadContEqs ("experiment" </> "benchmark" <.> "json")
     --let exprs = contTests
-    extents <- mapM (replicateM numExtents . genExtents possibleSizes maxTotalElemCount) exprs
-    let benchmarks = concat $ zipWith3 (\expr exts name -> zipWith (\ext extName -> (expr,ext,stripEnd [text|cont${name}_$extName|])) exts nums) exprs extents nums
+    --extents <- mapM (replicateM numExtents . genExtents possibleSizes maxTotalElemCount) exprs
+    benchmarks <- loadBenchmarks "C:/Users/Andris/Documents/anomaly.json"
+    let --benchmarks = concat $ zipWith3 (\expr exts name -> zipWith (\ext extName -> (expr,ext,stripEnd [text|cont${name}_$extName|])) exts nums) exprs extents nums
         benchNames = map thdOf3 benchmarks
     saveBenchmarks ("benchmark"</>"data"</>"expressions"<.>"json") benchmarks
     -- let sizes = iterateN 5 (*2) 8 -- every expression will be benchmarked with each of these sizes
     putStrLn "Benchmarked contractions:"
     mapM_ (\(expr,_,name) -> let pretty = printContraction False expr in T.putStr [text|$name) $pretty|]) benchmarks
-    codeParts <- map unzip . chunk <$> mapM (uncurry3 $ makeBenchmark benchmarkToLambdaGen) benchmarks
+    codeParts <- map unzip . chunk <$> mapM (uncurry3 $ makeBenchmark compileLoopEval) benchmarks
     let add_benchmark (T.unwords -> names) num = [text|add_benchmark($num $names)|]
     T.writeFile ("benchmark"</>"add_executables"<.>"txt") $ T.concat $ zipWith add_benchmark (chunk benchNames) nums
     zipWithM_ (\(funs,regs) num -> T.writeFile ("benchmark"</>"src"</>"main" ++ show num<.>"cpp") $ benchMainCode (map (include "h") benchNames) funs regs) codeParts [0..]
