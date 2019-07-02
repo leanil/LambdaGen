@@ -20,7 +20,7 @@ main = do
     let numExprs = 5
         numExtents = 5 -- number of different extent sets for each expression
         config = GenConfig 1 4 1 4 1 6 1 1 -- minDims,maxDims, minOperands,maxOperands, minTensors,maxTensors, minSums,maxSums
-        (possibleSizes, maxTotalElemCount) = ([2,4,5,7,8,32,48,50,64,100,250,512,1000,1024,1047], 1000000)
+        (possibleSizes, maxTotalElemCount) = ([2,4,5,7,8,32,48,50,64,100,250,512,1000,1024,1047], (0,1000000))
         nums = map tshow [0..]
         chunk = chunkList 50
     resetDir ("benchmark"</>"build")
@@ -34,7 +34,7 @@ main = do
     saveBenchmarks ("benchmark"</>"data"</>"expressions"<.>"json") benchmarks
     -- let sizes = iterateN 5 (*2) 8 -- every expression will be benchmarked with each of these sizes
     putStrLn "Benchmarked contractions:"
-    zipWithM_ (\expr num -> let pretty = printContraction False expr in T.putStr [text|$num) $pretty|]) exprs nums
+    mapM_ (\(expr,_,name) -> let pretty = printContraction False expr in T.putStr [text|$name) $pretty|]) benchmarks
     codeParts <- map unzip . chunk <$> mapM (uncurry3 $ makeBenchmark benchmarkToLambdaGen) benchmarks
     let add_benchmark (T.unwords -> names) num = [text|add_benchmark($num $names)|]
     T.writeFile ("benchmark"</>"add_executables"<.>"txt") $ T.concat $ zipWith add_benchmark (chunk benchNames) nums
