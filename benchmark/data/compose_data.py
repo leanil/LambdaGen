@@ -15,7 +15,8 @@ def merge_json(expr, time, id):
     result["extents"] = expr["extents"]
     result["time"] = time["cpu_time"]
     result["count"] = expr["count"]
-    result["cost"],result["value"] = 0,0
+    result["cost"] = expr["cost"]
+    result["value"] = 0
     result["tree"] = expr["tree"]
     return result
 

@@ -10,9 +10,10 @@ import Type
 import Utility
 import Control.Comonad (extract)
 import Control.Comonad.Cofree (Cofree(..))
-import Data.Aeson (Value, (.=), decode, encode, object, toJSON)
+import Data.Aeson (Value, (.:), (.=), decode, encode, object, toJSON, withObject)
+import Data.Aeson.Types (parseMaybe)
 import Data.Functor.Foldable (cata, para)
-import Data.Map.Strict (Map, fromList, singleton, toList, unions)
+import Data.Map.Strict (Map, (!), fromList, singleton, toList, unions)
 import Data.Maybe (fromJust)
 import Data.Text (Text, append, intercalate, stripEnd, unpack)
 import Data.Text as T (concat, cons)
@@ -122,9 +123,23 @@ benchToJson expr sizes name = object ["name" .= name,
                                       "pretty" .= stripEnd (printContraction False expr),
                                       "extents" .= toJSON (fromList $ map (\i -> (i,sizes i)) $ collectIndices expr),
                                       "count" .= snd (cata (ignoreAlg nodeCount) expr), 
+                                      "cost" .= cost sizes expr,
                                       "tree" .= treeToJson expr sizes]
 
 treeToJson :: ContEq -> Extents -> Value
 treeToJson expr sizes = cata alg expr where
     alg (shape ::< TensorF name indices) = object ["tag" .= ("Tensor"::String), "id" .= name, "indices" .= indices]
     alg (shape ::< SumF index ops) = object ["tag" .= ("Sum"::String), "index" .= index, "range" .= sizes index, "operands" .= ops]
+
+loadBenchmarks :: FilePath -> IO [(ContEq, Extents, Text)]
+loadBenchmarks path = do
+    text <- T.readFile path
+    let parseText text = withObject "data" parseObj $ fromJust $ decode $ encodeUtf8 text
+        parseObj obj = do
+            d <- obj .: "data"
+            mapM (\i -> do
+                tree <- i .: "tree"
+                ext <- i .: "extents"
+                name <- i.: "name"
+                return (tree, (ext !), name)) d
+    return $ fromJust $ parseMaybe parseText text

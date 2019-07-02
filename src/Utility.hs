@@ -85,3 +85,8 @@ thdOf3   :: (a,b,c) -> c
 fstOf3      (a,_,_) =  a
 sndOf3      (_,b,_) =  b
 thdOf3      (_,_,c) =  c
+
+iterateUntilM :: (Monad m) => (a -> Bool) -> (a -> m a) -> a -> m a
+iterateUntilM p f v 
+    | p v       = return v
+    | otherwise = f v >>= iterateUntilM p f

@@ -21,7 +21,7 @@ import Data.Functor.Foldable (Base, ana, cata)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.List (foldl', partition)
 import Data.List.Ordered (has, member, minus, sort, union)
-import Data.Map.Strict as Map ((!), fromAscList)
+import Data.Map.Strict as Map ((!), adjust, fromAscList)
 import Data.Maybe (isJust)
 import Data.Text (unpack)
 import Hedgehog (Gen, MonadGen)
@@ -49,10 +49,10 @@ instance ToJSON ContEq where
         alg (shape ::< TensorF name indices) = object ["tag" .= ("Tensor"::String), "id" .= name, "indices" .= indices, "shape" .= shape]
         alg (shape ::< SumF index ops) = object ["tag" .= ("Sum"::String), "index" .= index, "operands" .= ops, "shape" .= shape]
 instance FromJSON ContEq where
-    parseJSON = anaM alg where
+    parseJSON val = calcDims <$> anaM alg val where
         alg = withObject "ContEq" $ \v -> do
             tag <- v .: "tag"
-            (::<) <$> v .: "shape" <*> case tag of
+            case tag of
                 ("Tensor"::String) -> TensorF <$> v .: "id" <*> v .: "indices"
                 "Sum" -> SumF <$> v .: "index" <*> v .: "operands"
                
@@ -101,7 +101,7 @@ genExpr config xs = do
 subsequence :: MonadGen m => (Int,Int) -> [a] -> m [a]
 subsequence (minLength,maxLength) xs 
     | minLength <= min maxLength (length xs) = 
-        Gen.filter (\case (length -> l) -> minLength <= l && l <= maxLength) (Gen.subsequence xs) >>= Gen.shuffle -- TODO: generate well-sized subsets directly
+        Gen.filter (\case (length -> l) -> minLength <= l && l <= maxLength) (Gen.subsequence xs) -- >>= Gen.shuffle -- TODO: generate well-sized subsets directly
   
 sample :: GenConfig -> IO ContEq
 sample config = calcDims <$> Gen.sample (evalStateT (genContExpr config) (GenState 0 0 0))
@@ -147,11 +147,21 @@ totalSize :: Extents -> ContEq -> Int
 totalSize sizes = cata (\case (_ ::< TensorF _ idxs) -> product $ map sizes idxs
                               (shape ::< SumF _ ops) -> sum ops + product (map sizes shape))
 
+cost :: Extents -> ContEq -> [Int] -- [add, mul, good read, bad read, write]
+cost sizes expr@(shape :< _) = map (resultSize*) $ cata (ignoreAlg alg) expr ++ [1] where
+    alg TensorF{} = [0,0,1,0]
+    alg (SumF (sizes -> rng) ops) = map (rng*) $ foldl' (zipWith (+)) [1,length ops,0,0] ops
+    resultSize = product $ map sizes shape
+
 collectIndices :: ContEq -> [Int]
 collectIndices = cata (ignoreAlg alg) where
     alg (TensorF _ idxs) = sort idxs
     alg (SumF i ops) = foldl' union [i] ops
     
-genExtents :: [Int] -> Int -> ContEq -> IO Extents
-genExtents sizes maxSize expr = Gen.sample $ Gen.filter (\exts -> totalSize exts expr <= maxSize) $
-    (!) . Map.fromAscList <$> mapM (\ind -> do ext <- Gen.element sizes; pure (ind,ext)) (collectIndices expr)
+genExtents :: [Int] -> (Int,Int) -> ContEq -> IO Extents
+genExtents sizes (minSize,maxSize) expr = Gen.sample $ (!) <$> do
+    let indices = collectIndices expr
+        filter (minSize,maxSize) exts = let s = sum $ cost (exts !) expr in s >= minSize && s <= maxSize
+        increase exts = do ind <- Gen.element indices; pure $ adjust (*2) ind exts
+    exts <- Gen.filter (filter (0,maxSize)) $ Map.fromAscList <$> mapM (\ind -> do ext <- Gen.element sizes; pure (ind,ext)) indices
+    iterateUntilM (filter (minSize,maxSize)) increase exts
