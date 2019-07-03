@@ -17,32 +17,33 @@ import System.FilePath ((</>),(<.>))
 
 main :: IO ()
 main = do
-    let numExprs = 5
-        numExtents = 5 -- number of different extent sets for each expression
+    let numExprs = 1000
+        numExtents = 10 -- number of different extent sets for each expression
         config = GenConfig 1 4 1 4 1 6 1 1 -- minDims,maxDims, minOperands,maxOperands, minTensors,maxTensors, minSums,maxSums
-        (possibleSizes, maxTotalElemCount) = ([2,4,5,7,8,32,48,50,64,100,250,512,1000,1024,1047], (0,1000000))
+        (possibleSizes, totalCost) = ([2,4,5,7,8,32,48,50,64,100,250,512,1000,1024,1047], (1000,10000)) -- total cost must be between the bounds
+        chunk = chunkList 100 -- an executable contains this number of benchmarks
+        compiler = compileLoopEval -- benchmarkToLambdaGen
         nums = map tshow [0..]
-        chunk = chunkList 50
     resetDir ("benchmark"</>"build")
     resetDir ("benchmark"</>"src")
     exprs <- replicateM numExprs $ sample config
     --exprs <- loadContEqs ("experiment" </> "benchmark" <.> "json")
     --let exprs = contTests
-    extents <- mapM (replicateM numExtents . genExtents possibleSizes maxTotalElemCount) exprs
+    extents <- mapM (replicateM numExtents . genExtents possibleSizes totalCost) exprs
     let benchmarks = concat $ zipWith3 (\expr exts name -> zipWith (\ext extName -> (expr,ext,stripEnd [text|cont${name}_$extName|])) exts nums) exprs extents nums
         benchNames = map thdOf3 benchmarks
     saveBenchmarks ("benchmark"</>"data"</>"expressions"<.>"json") benchmarks
     -- let sizes = iterateN 5 (*2) 8 -- every expression will be benchmarked with each of these sizes
     putStrLn "Benchmarked contractions:"
     mapM_ (\(expr,_,name) -> let pretty = printContraction False expr in T.putStr [text|$name) $pretty|]) benchmarks
-    codeParts <- map unzip . chunk <$> mapM (uncurry3 $ makeBenchmark benchmarkToLambdaGen) benchmarks
+    codeParts <- map unzip . chunk <$> mapM (uncurry3 $ makeBenchmark compiler) benchmarks
     let add_benchmark (T.unwords -> names) num = [text|add_benchmark($num $names)|]
     T.writeFile ("benchmark"</>"add_executables"<.>"txt") $ T.concat $ zipWith add_benchmark (chunk benchNames) nums
     zipWithM_ (\(funs,regs) num -> T.writeFile ("benchmark"</>"src"</>"main" ++ show num<.>"cpp") $ benchMainCode (map (include "h") benchNames) funs regs) codeParts [0..]
     let runProc = createProcessAndExitOnFailure $ "benchmark" </> "build"
     runProc "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
     runProc "cmake" ["--build", ".", "--config", "Release", "--parallel"]
-    runProc "cmake" ["--build", ".", "--config", "Release", "--target", "data"]
+    runProc "cmake" ["--build", ".", "--config", "Release", "--target", "data", "--parallel"]
 
 benchMainCode :: [Text] -> [Text] -> [Text] -> Text
 benchMainCode (T.concat -> includes) (T.concat -> benchFuns) (T.concat -> regs) =

@@ -40,7 +40,7 @@ function(add_benchmark num)
     set(OUT_JSON ${CMAKE_SOURCE_DIR}/data/times${num}.json)
     set(TIME_FILES ${TIME_FILES} ${OUT_JSON} PARENT_SCOPE)
     add_custom_command(OUTPUT ${OUT_JSON}
-                       COMMAND ${BENCH} --benchmark_repetitions=5 --benchmark_out=${OUT_JSON}
+                       COMMAND ${BENCH} --benchmark_repetitions=3 --benchmark_min_time=0.1 --benchmark_out=${OUT_JSON}
                                         --benchmark_out_format=json --benchmark_report_aggregates_only=true
                        DEPENDS ${BENCH}
                        COMMENT "Running benchmark ${num}")
