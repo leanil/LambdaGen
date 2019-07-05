@@ -19,7 +19,9 @@ main :: IO ()
 main = do
     let numExprs = 5
         numExtents = 5 -- number of different extent sets for each expression
-        config = GenConfig 1 4 1 4 1 6 1 1 -- minDims,maxDims, minOperands,maxOperands, minTensors,maxTensors, minSums,maxSums
+        config = GenConfig { minDims = 1, maxDims = 4, minOperands = 1, maxOperands = 4,
+                             minTensors = 1, maxTensors = 6, minSums = 1, maxSums = 1,
+                             allowUnorderedIndexing = True, allowIrregularSums = False }
         (possibleSizes, maxTotalElemCount) = ([2,4,5,7,8,32,48,50,64,100,250,512,1000,1024,1047], (0,1000000))
         nums = map tshow [0..]
         chunk = chunkList 50
@@ -44,6 +46,19 @@ main = do
     runProc "cmake" ["-DCMAKE_BUILD_TYPE=Release", ".."]
     runProc "cmake" ["--build", ".", "--config", "Release", "--parallel"]
     runProc "cmake" ["--build", ".", "--config", "Release", "--target", "data"]
+
+data BenchConfig = BenchConfig {
+    numExprs, numExtents :: Int,
+    genConfig :: GenConfig,
+    possibleSizes :: [Int],
+    minTotalCost, maxTotalCost :: Int,
+    compiler :: String,
+    executableSize :: Int,
+    buildThreads, runThreads :: Int
+}
+
+prepareBenchmarks :: BenchConfig -> [(ContEq,Extents)]
+prepareBenchmarks = undefined
 
 benchMainCode :: [Text] -> [Text] -> [Text] -> Text
 benchMainCode (T.concat -> includes) (T.concat -> benchFuns) (T.concat -> regs) =

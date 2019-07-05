@@ -1,6 +1,7 @@
 module Test.ContractionTest where
 
 import Generate.Contraction
+import Data.List (permutations)
 
 -- Baseline:
 t01 = calcDims $ Sum 0 [Tensor 0 [0]] -- a = sum_i A_i
@@ -53,4 +54,6 @@ t39 = calcDims $ Sum 2 [Tensor 0 [0,1,2], Sum 3 [Tensor 1 [2,3], Tensor 2 [3]]] 
 t310 = calcDims $ Sum 2 [Tensor 0 [0,1,2], Sum 3 [Tensor 1 [0,2,3], Tensor 2 [3]]] -- t10_ij = sum_k A_ijk * (sum_l B_ikl * C_l)    (double product fusion check, temporary should be better)
 t311 = calcDims $ Sum 2 [Tensor 0 [0], Tensor 1 [1], Tensor 2 [2], Sum 3 [Tensor 3 [0,2,3], Tensor 4 [3]]] -- t11_ij = sum_k (A_i * B_j * C_k) * (sum_l D_ikl * E_l)    (double product fusion check with outer product, temporary should be better)
 
+-- Generalized matrix multiplications
+genMatMul = map (calcDims . \(ind0,ind1) -> Sum 3 [Tensor 0 ind0, Tensor 1 ind1]) [(ind0,ind1)|ind0 <- permutations [0,1,3], ind1 <- permutations [2,3]]
 contTests = [t01, t03, t11, t12, t21, t22, t26, t27, t210, t211, t211a, t211b, t211c, t31, t31a, t31b, t31c, t31d, t31e, t31f, t32, t33, t38, t39, t310, t311]

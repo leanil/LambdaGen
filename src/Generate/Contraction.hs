@@ -65,23 +65,27 @@ calcDims = cata alg where
 dimRange = Range.constant  1 4
 numOps = Range.constant  1 4
 
-data GenConfig = GenConfig { minDims,maxDims, minOperands,maxOperands, minTens,maxTens, minSums,maxSums :: Int }
+data GenConfig = GenConfig { 
+    minDims,maxDims :: Int,
+    minOperands,maxOperands :: Int,
+    minTensors,maxTensors :: Int,
+    minSums,maxSums :: Int,
+    allowUnorderedIndexing :: Bool,
+    allowIrregularSums :: Bool
+}
 data GenState = GenState { tensorId :: Int, sumId :: Int, resultDims :: Int }
 
 genContExpr :: GenConfig -> StateT GenState Gen ContExpr
 genContExpr config = do
     resDims <- Gen.int $ Range.constant (minDims config) (maxDims config)
     let initGenExpr = do put $ GenState 0 resDims resDims; genExpr config [0..resDims-1]
-    --     noConstResult xs = if and $ map (has xs) [0..resDims-1] then Just () else Nothing
-    --     alg (TensorF _ xs) = Just xs
-    --     alg (SumF i ops) = case (and $ map (member i) ops) of
-    --                             True -> Just $ foldl' union [] ops
-    --                             False -> Nothing
-    --     noConstSum = isJust . (noConstResult <=< cataM alg)
-    let check expr = countsOk && resultDimsOk where
-            countsOk = s >= minSums config && s <= maxSums config && t >= minTens config && t <= maxTens config
+        check expr = countsOk && resultDimsOk && sumsOk where
+            countsOk = s >= minSums config && s <= maxSums config && t >= minTensors config && t <= maxTensors config
             resultDimsOk = extract (calcDims expr) == [0..resDims-1]
+            sumsOk = allowIrregularSums config || isJust (cataM alg expr)
             (s,t) = cata nodeCount expr
+            alg (TensorF _ xs) = Just xs
+            alg (SumF i ops) = if all (member i) ops then Just $ foldl' union [] ops else Nothing
     Gen.filter check initGenExpr
 
 genExpr :: GenConfig -> [Int] -> StateT GenState Gen ContExpr
@@ -90,7 +94,7 @@ genExpr config xs = do
     let pSum = if nextSum - resDims < maxSums config then 1 else 0
         genTensor = do
             modify (\s -> s { tensorId = nextTensor + 1 })
-            subs <- subsequence (minDims &&& maxDims $ config) xs
+            subs <- subsequence (minDims &&& maxDims $ config) (allowUnorderedIndexing config) xs
             pure $ Tensor nextTensor subs
         genSum = do
             modify (\s -> s { sumId = nextSum + 1 })
@@ -98,10 +102,11 @@ genExpr config xs = do
             pure $ Sum nextSum ops
     Gen.frequency [(1,genTensor),(pSum,genSum)]
 
-subsequence :: MonadGen m => (Int,Int) -> [a] -> m [a]
-subsequence (minLength,maxLength) xs 
+subsequence :: MonadGen m => (Int,Int) -> Bool -> [a] -> m [a]
+subsequence (minLength,maxLength) shuffle xs 
     | minLength <= min maxLength (length xs) = 
-        Gen.filter (\case (length -> l) -> minLength <= l && l <= maxLength) (Gen.subsequence xs) -- >>= Gen.shuffle -- TODO: generate well-sized subsets directly
+        Gen.filter (\case (length -> l) -> minLength <= l && l <= maxLength) (Gen.subsequence xs) >>= -- TODO: generate well-sized subsets directly
+            if shuffle then Gen.shuffle else pure
   
 sample :: GenConfig -> IO ContEq
 sample config = calcDims <$> Gen.sample (evalStateT (genContExpr config) (GenState 0 0 0))
